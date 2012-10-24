@@ -1,145 +1,77 @@
 /*
- * FILE: linked_list.c
+ * Robert Karol
+ * CS 11 C track
+ * Lab 6
  *
+ * This function takes in a list of arguments, and sorts them using the
+ * quicksort method. The quicksort method sets aside the first element in
+ * the list, and divides the rest of the list up into two lists, a list
+ * of elements lower than the first list, and a list of elements greater than
+ * or equal to the first element. Then it recursively calls this procedure
+ * on each of the low and high lists, and appends together the low list with
+ * the first element, and high list. This function runs in O(nlog(n)) time.
  */
-
-#include <stdio.h>
+#include <assert.h>
 #include <stdlib.h>
-#include "memcheck.h"
+#include <string.h>
+#include <stdio.h>
 #include "linked_list.h"
+#include "memcheck.h"
 
+/* These are the function prototypes. */
+node *quicksort(node *list);
+int usage(void);
 
-/*
- * create_node:
- *     Create a single node and link it to the node called 'n'.
- */
-
-node *create_node(int data, node *n) {
-  node *result = (node *)malloc(sizeof(node));
-
-  if(result == NULL) {
-    fprintf(stderr, "Fatal error: out of memory. "
-                    "Terminating program.\n");
-    exit(1);
+int main(int argc, char *argv[]) {
+  /* Type declarations. */
+  int i;
+  int q = 1;
+  int quiet = 0;
+  node *current;
+  node *result;
+  node *previous = NULL;
+  /* If there are no arguments, display the usage message. */
+  if(q == argc) {
+    usage();
   }
-
-  result->data = data;  /* Fill in the new node with the given value. */
-  result->next = n;
-
-  return result;
-}
-
-
-/*
- * free_list:
- *     Free all the nodes of a linked list.
- */
-
-void free_list(node *list) {
-  node *n;     /* a single node of the list */
-
-  while (list != NULL) {
-    n = list;
-    list = list->next;
-    free(n);
-  }
-}
-
-
-/*
- * copy_list:
- *     Return a copy of a list.
- */
-
-node *copy_list(node *list) {
-  node *new_list;
-  if (list == NULL) {
-    return list;
-  }
-  else {
-    new_list = create_node(list->data,copy_list(list->next));
-    return new_list;
-  }
-}
-
-
-/*
- * append_lists:
- *     Return a list which is a copy of the concatenation of the two
- *     input lists.
- */
-
-node *append_lists(node *list1, node *list2) {
-  node *item;
-
-  if(list1 == NULL) {
-    return copy_list(list2);
-  }
-  else if (list2 == NULL) {
-    return copy_list(list1);
-  }
-  else {
-    node *new_list1 = copy_list(list1);
-    node *new_list2 = copy_list(list2);
-
-    for (item = new_list1; item != NULL; item = item->next) {
-      if (item->next == NULL)  /* We're on the last node. */
-      {
-        item->next = new_list2;
-        break;
-      }
+  /* Check through each argument in argv[]. */
+  for(i = 1; i < argc; i++) {
+    /*
+     * If the argument is -q, increment q to show there is one less
+     * integer argument and set quiet to 1 so that the program does not
+     * output the list.
+     */
+    if(strcmp(argv[i], "-q") == 0) {
+      quiet = 1;
+      q++;
     }
-    return new_list1;
+    /* If there are no integer arguments, display the usage message. */
+    if(q == argc) {
+      usage();
+    }
+    /* If it is an integer, place it into the current linked list. */
+    else {
+      current = create_node(atoi(argv[i]), previous);
+      previous = current;
+    }
   }
-}
-
-
-/*
- * Make a reversed copy of a list.
- */
-
-node *reverse_list(node *list) {
-  node *item;
-  node *reversed_list = NULL;
-
-  for(item = list; item != NULL; item = item->next) {
-    reversed_list = create_node(item->data, reversed_list);
+  /*
+   * Sort the list using the quicksort function, and set result to
+   * be a pointer to the new sorted list.
+   */
+  result = quicksort(current);
+  /* Assert that the list is sorted. */
+  assert(is_sorted(result));
+  /* Print the sorted list if -q wasn't found in the command arguments. */
+  if(quiet == 0) {
+    print_list(result);
   }
-
-  return reversed_list;
-}
-
-
-/*
- * Print the elements of a list.
- */
-
-void print_list(node *list) {
-  node *item;
-
-  for (item = list; item != NULL; item = item->next) {
-    printf("%d\n", item->data);
-  }
-}
-
-/*
- * Return 1 if a list is sorted, otherwise 0.
- * Useful for debugging.
- */
-
-int is_sorted(node *list) {
-  node *item;
-
-  /* An empty list is sorted by definition. */
-  if (list == NULL)
-    return 1;
-
-  for (item = list; item->next != NULL; item = item->next) {
-    if (item->data > item->next->data)  /* wrong order */
-      return 0;
-  }
-
-  return 1;  /* The list is sorted. */
+  /* Free the allocated memory. */
+  free_list(current);
+  free_list(result);
+  /* Print memory leaks. */
+  print_memory_leaks();
+  return 0;
 }
 
 /*
@@ -247,4 +179,17 @@ node *quicksort(node *list) {
     free_list(first_element);
     /* Return the sorted list. */
   return result;
+}
+
+
+
+/*
+ * This is the usage statement. It prints an error telling the user how
+ * to use the program.
+ */
+int usage(void) {
+  fprintf(stderr, "This function takes in a list of integer arguments"
+                  " and prints a sorted copy of the list. The argument"
+                  " -q supresses the ouput of the function.");
+  exit(1);
 }

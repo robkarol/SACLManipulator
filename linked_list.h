@@ -39,6 +39,9 @@ void print_list(node *list);
 /* Return 1 if a list is sorted, otherwise 0. */
 int is_sorted(node *list);
 
+/* Sorts a linked list, low to high using the quicksort algorithm. */
+node *quicksort(node *list);
+
 #endif  /* LINKED_LIST_H */
 
 

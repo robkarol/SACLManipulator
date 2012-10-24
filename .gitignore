@@ -13,3 +13,5 @@
 
 # CodeBlocks Files
 *.cbp
+*.layout
+*.cpp
