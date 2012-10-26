@@ -43,5 +43,3 @@ int is_sorted(node *list);
 node *quicksort(node *list);
 
 #endif  /* LINKED_LIST_H */
-
-
