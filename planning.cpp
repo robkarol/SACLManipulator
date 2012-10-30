@@ -941,45 +941,52 @@ int FindSafePath(struct tree **T_ptrs, int** replan_indices, int num_replans, in
 
 int ExhaustiveRePlan(struct tree **T_ptrs, int* n_nodes, double eta_RRT, double gamma_RRT, char* NN_alg, int* pathlenA, int* pathlenB, int** pathA, int** pathB,
 	double*** path, double* q, double epsilon, int n, double* w, struct obstacles* obs, struct geom *G, struct DHparams *DH, char* filename) {
-	
-	int n_neighbors = 0, cost_type = 2, k = 0, unsafe = 1;
-	int *neighbors				= (int*) malloc( (max(n_nodes[0], n_nodes[1]))*sizeof(int) );
-	double *costs				= (double*) malloc( (max(n_nodes[0], n_nodes[1]))*sizeof(double) );
-	int **replan_indices		= Make2DIntArray(1,3);
-	struct list_node* node_ptr	= NULL;
 
-	// Feasibility-Priority Search
-	/* In the case that the cost-priority search from RePlan was unsuccessful, conduct an exhaustive search with focus not on costs but on
-	feasibility.  First search for feasible nodes over each tree, then accept the first feasible solution found.  */
-	for (int t = 1; t >= 0; t--) {
-		NearestNeighbors( T_ptrs[t], n_nodes[t], q, n, w, n_nodes[t], cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
-		
-		while (unsafe == 1 && k < n_neighbors) {
-			if ( T_ptrs[t]->safety[ neighbors[k] ] == 1 ) {
+		int n_neighbors = 0, cost_type = 2, unsafe = 1, k;
+		int *neighbors	= (int*) malloc( (max(n_nodes[0], n_nodes[1]))*sizeof(int) );
+		double *costs	= (double*) malloc( (max(n_nodes[0], n_nodes[1]))*sizeof(double) );
+		int **replan_indices	= Make2DIntArray(1,3);
+		struct list_node* node_ptr	= NULL;
 
-				node_ptr = T_ptrs[t]->leaf_lists[ neighbors[k] ];
-				while ( node_ptr != NULL && unsafe == 1 ) {
-					if ( T_ptrs[t]->safety[ node_ptr->data ] == 1 ) {
-						replan_indices[0][0] = t;
-						replan_indices[0][1] = neighbors[k];
-						replan_indices[0][2] = node_ptr->data;
-						unsafe = FindSafePath( T_ptrs, replan_indices, 1, pathlenA, pathlenB, pathA, pathB, path, q, epsilon, n, w, obs, G, DH, filename );
+		// Feasibility-Priority Search
+		/* In the case that the cost-priority search from RePlan was unsuccessful, conduct an exhaustive search with focus not on costs but on
+		feasibility. First search for feasible nodes over each tree, then accept the first feasible solution found. */
+		for (int t = 1; t >= 0; t--) {
+			NearestNeighbors( T_ptrs[t], n_nodes[t], q, n, w, n_nodes[t], cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
+
+			k = 0;
+			while (unsafe == 1 && k < n_neighbors) {
+				if ( T_ptrs[t]->safety[ neighbors[k] ] == 1 ) {
+
+					node_ptr = T_ptrs[t]->leaf_lists[ neighbors[k] ];
+					while ( node_ptr != NULL && unsafe == 1 ) {
+						if ( T_ptrs[t]->safety[ node_ptr->data ] == 1 ) {
+							if (t == 0) {
+								replan_indices[0][0] = 0;
+								replan_indices[0][1] = neighbors[k];
+								replan_indices[0][2] = node_ptr->data;
+							} else {
+								replan_indices[0][0] = 1;
+								replan_indices[0][1] = 0;
+								replan_indices[0][2] = neighbors[k];
+							}
+							unsafe = FindSafePath( T_ptrs, replan_indices, 1, pathlenA, pathlenB, pathA, pathB, path, q, epsilon, n, w, obs, G, DH, filename );
+						}
+						node_ptr = node_ptr->next;
 					}
-					node_ptr = node_ptr->next;
 				}
+
+				k = k + 1;
 			}
 
-			k = k + 1;
+			if ( unsafe == 0 ) {
+				break;
+			}
 		}
 
-		if ( unsafe == 0 ) {
-			break;
-		}
-	}
-
-	free(replan_indices[0]); free(replan_indices);
-	free(neighbors); free(costs);
-	return unsafe;
+		free(replan_indices[0]); free(replan_indices);
+		free(neighbors); free(costs);
+		return unsafe;
 }
 
 void ResetSimulation( struct tree* trees, int n_trees, int n_plans, int* num_nodes, int* feasible, int** node_star_index, struct obstacles* obs, Engine* matlab ) {

@@ -136,7 +136,8 @@ int main() {
 	/* (1) Define general user settings */
 	char load_previous			= 'y';								/* Load a previous run? (y/n) */
 	char disp_matlab_plots		= 'y';								/* Display MATLAB plots? (y/n/a) [a = "all" (also plots RRT figures, which is very time-consuming)] */
-	char filename[FILENAME_MAX]	= "C:/Users/user/Desktop/SACL/RRT1";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
+	//char filename[FILENAME_MAX]	= "C:/Users/user/Desktop/SACL/RRT1";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
+	char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
 	char soln[11]				= "suboptimal";						/* Type of solution to seek: "feasible" (exit at 1st solution found), "suboptimal" (attempt to find "max_neighbors" # of solutions) */
 	char sampling[13]			= "halton";							/* Sampling sequence: "pseudorandom", "halton" */
 	char NN_alg[12]				= "brute_force";					/* Nearest neighbor algorithm: "brute_force", "kd_tree" (INOPERATIVE - BUG IN KDTREE LIBRARY) */
@@ -205,7 +206,7 @@ int main() {
 	double grip_VelLimThrottle	= 1.0;								/* Set the velocity limit of the end effector actuator as a fraction from VelMin to VelMax */
 	
 	// char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	char	tempsensor_file[]	= "C:/Users/user/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	char	tempsensor_file[]	= "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
 	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 5.0, 5.0, 5.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
 	double pos_y_tempsensors[]  = { 0.0, -1.15, 0.0, 0.0, -1.15, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
 	double pos_z_tempsensors[]  = { 1.125, 0.0, -1.125, 1.125, 0.0, -1.125 };	/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
@@ -781,7 +782,7 @@ int main() {
 
 		/* If temperature obstacles were added and the current motion plan is complete,
 		update the trees of the next motion plan to account for the temperature obstacles */
-		if ( (obs->n_temp_zones > 0) && (i < n_plans - 1) ) {
+		if ( (obs->n_temp_zones > 0) && (i <= n_plans - 1) ) {
 			TempObsViolation( &(tree_ptrs[2*(i+1)]), &(num_nodes[2*(i+1)]), n, obs, G, DH );
 			unsafe		= 1;		// Short-circuits next iteration to a replan cycle
 		}
