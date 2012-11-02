@@ -205,8 +205,8 @@ int main() {
 	double grip_AccelThrottle	= 0.01;								/* Set the acceleration the end effector actuator as a fraction from AccelMin to AccelMax */
 	double grip_VelLimThrottle	= 1.0;								/* Set the velocity limit of the end effector actuator as a fraction from VelMin to VelMax */
 	
-	// char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	char	tempsensor_file[]	= "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	// char	tempsensor_file[]	= "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
 	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 5.0, 5.0, 5.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
 	double pos_y_tempsensors[]  = { 0.0, -1.15, 0.0, 0.0, -1.15, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
 	double pos_z_tempsensors[]  = { 1.125, 0.0, -1.125, 1.125, 0.0, -1.125 };	/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
@@ -219,10 +219,10 @@ int main() {
 	double offset_tempobs		= 1.5;			/* Normal offset from the sensor at which to begin the cone */
 	double H_tempobs			= 5;			/* Height of truncated-cone temperature obstacle(s) located above the sensor [in] */
 	double beta_tempobs			= 15;			/* Half-angle of truncated-cone temperature obstacle(s) [deg] */
-	double	t_obs_intro[]		= { 10.0 };		/* Time at which any artificial temperature obstacles are introduced (must be in ascending order) [s] */
-	int		obs_sensor[]		= { 2 };		/* Sensors that "detect" fake temperature obstacles at the times above (1,2,3... - enter NULLs for no obstacles) */
-	int		n_fakeobs			= 1;			/* Total number of artificial temperature sensor violations */
-	int		n_tempobs_max		= 1;			/* Maximum number of temperature obstacles allowed */
+	double	t_obs_intro[]		= {  10, 20};		/* Time at which any artificial temperature obstacles are introduced (must be in ascending order) [s] */
+	int		obs_sensor[]		= {  2, 5};		/* Sensors that "detect" fake temperature obstacles at the times above (1,2,3... - enter NULLs for no obstacles) */
+	int		n_fakeobs			= 2;			/* Total number of artificial temperature sensor violations */
+	int		n_tempobs_max		= 2;			/* Maximum number of temperature obstacles allowed */
 
 	// Demos: 8.0 s, 6		10.0 s, 2		11.0 s, 5		8.0,13.0 6,5
 
@@ -509,7 +509,10 @@ int main() {
 
 		if (matlab != NULL) {
 			printf("Close figures and quit MATLAB? (y/n + ENTER): ");	fflush(stdout);		scanf("%s", user_input);
-			if ( strncmp( user_input, "y", 1 ) == 0 ) engEvalString(matlab, "close all; quit;");
+			if ( strncmp( user_input, "y", 1 ) == 0 )	
+			{
+					engEvalString(matlab, "close all; quit;");
+			}
 		}
 		printf("END\n");	Sleep(1500);		exit(1);
 	}
@@ -632,36 +635,35 @@ int main() {
 					if (file_ptr != NULL) {
 						rewind(file_ptr);
 						fscanf( file_ptr, "%i", &violation );
-						printf("Checked for violation from tempsensor file.");
 					} else {
-						//t_current = clock();
-						//if (ifKit != NULL || ( (fakeobs_index < n_fakeobs) && (ElapsedTime( t_beginmotion, t_current ) > 1000*t_obs_intro[fakeobs_index]) ) ) {
-						//	for (int k = 0; k < n_tempsensors; k++) {
-						//		if (ifKit == NULL) {
-						//			/* The time must have exceeded the obstacle introduction time.  Introduce a fake disturbance. */
-						//			if (k == (obs_sensor[fakeobs_index]-1)) {
-						//				violation		= 1;
-						//				pos_maxheat[0]	= pos_x_tempsensors[k];			n_hat_tempobs[0]	= n_x_tempsensors[k];
-						//				pos_maxheat[1]	= pos_y_tempsensors[k];			n_hat_tempobs[1]	= n_y_tempsensors[k];
-						//				pos_maxheat[2]	= pos_z_tempsensors[k];			n_hat_tempobs[2]	= n_z_tempsensors[k];
-						//				fakeobs_index	+= 1;
-						//				break;
-						//			} else continue;
-						//		} else {
-						//			/* The Interface Kit is actually connected.  Measure the temperature reading from each sensor. */
-						//			CPhidgetInterfaceKit_getSensorValue(ifKit, sensor_channels[k], &new_temp );
-						//			if ((new_temp > max_temp) && (temp[k] < max_temp)) {
-						//				violation		= 1;
-						//				pos_maxheat[0]	= pos_x_tempsensors[k];			n_hat_tempobs[0]	= n_x_tempsensors[k];
-						//				pos_maxheat[1]	= pos_y_tempsensors[k];			n_hat_tempobs[1]	= n_y_tempsensors[k];
-						//				pos_maxheat[2]	= pos_z_tempsensors[k];			n_hat_tempobs[2]	= n_z_tempsensors[k];
-						//				temp[k] = new_temp;
-						//				break;
-						//			}
-						//			temp[k] = new_temp;
-						//		}
-							//}
-					//	}
+						t_current = clock();
+						if (ifKit != NULL || ( (fakeobs_index < n_fakeobs) && (ElapsedTime( t_beginmotion, t_current ) > 1000*t_obs_intro[fakeobs_index]) ) ) {
+							for (int k = 0; k < n_tempsensors; k++) {
+								if (ifKit == NULL) {
+									/* The time must have exceeded the obstacle introduction time.  Introduce a fake disturbance. */
+									if (k == (obs_sensor[fakeobs_index]-1)) {
+										violation		= 1;
+										pos_maxheat[0]	= pos_x_tempsensors[k];			n_hat_tempobs[0]	= n_x_tempsensors[k];
+										pos_maxheat[1]	= pos_y_tempsensors[k];			n_hat_tempobs[1]	= n_y_tempsensors[k];
+										pos_maxheat[2]	= pos_z_tempsensors[k];			n_hat_tempobs[2]	= n_z_tempsensors[k];
+										fakeobs_index	+= 1;
+										break;
+									} else continue;
+								} else {
+									/* The Interface Kit is actually connected.  Measure the temperature reading from each sensor. */
+									CPhidgetInterfaceKit_getSensorValue(ifKit, sensor_channels[k], &new_temp );
+									if ((new_temp > max_temp) && (temp[k] < max_temp)) {
+										violation		= 1;
+										pos_maxheat[0]	= pos_x_tempsensors[k];			n_hat_tempobs[0]	= n_x_tempsensors[k];
+										pos_maxheat[1]	= pos_y_tempsensors[k];			n_hat_tempobs[1]	= n_y_tempsensors[k];
+										pos_maxheat[2]	= pos_z_tempsensors[k];			n_hat_tempobs[2]	= n_z_tempsensors[k];
+										temp[k] = new_temp;
+										break;
+									}
+									temp[k] = new_temp;
+								}
+							}
+						}
 					}
 				}
 
@@ -782,7 +784,7 @@ int main() {
 
 		/* If temperature obstacles were added and the current motion plan is complete,
 		update the trees of the next motion plan to account for the temperature obstacles */
-		if ( (obs->n_temp_zones > 0) && (i <= n_plans - 1) ) {
+		if ( (obs->n_temp_zones > 0) && (i < n_plans - 1) ) {
 			TempObsViolation( &(tree_ptrs[2*(i+1)]), &(num_nodes[2*(i+1)]), n, obs, G, DH );
 			unsafe		= 1;		// Short-circuits next iteration to a replan cycle
 		}
@@ -837,8 +839,11 @@ int main() {
 	if (matlab != NULL) {
 		printf("Close figures and quit MATLAB? (y/n + ENTER): "); fflush(stdout);
 		scanf("%s", user_input);
-		if ( strncmp( user_input, "y", 1 ) == 0 ) engEvalString(matlab, "close all; quit;");
-		engClose(matlab);
+		if ( strncmp( user_input, "y", 1 ) == 0 )
+		{
+			engEvalString(matlab, "close all; quit;");
+			engClose(matlab);
+		}
 	}
 
 	/*+============================================+*/
