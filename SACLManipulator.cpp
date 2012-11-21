@@ -138,12 +138,12 @@ int main() {
 	/*+=======================+*/
 
 	/* (1) Define general user settings */
-	char load_previous			= 'y';								/* Load a previous run? (y/n) */
+	char load_previous			= 'n';								/* Load a previous run? (y/n) */
 	char disp_matlab_plots		= 'y';								/* Display MATLAB plots? (y/n/a) [a = "all" (also plots RRT figures, which is very time-consuming)] */
 	char reset_trees			= 'n';								/* Reset the trees during simulation resets? (y/n) */
-	char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
+	//char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
 	//char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
-	//char filename[FILENAME_MAX] = "C:/Users/Joe/Desktop/SACL/RRT";
+	char filename[FILENAME_MAX] = "C:/Users/Joe/Desktop/ASL Research/2012 Summer/SACL/RRT";
 	char soln[11]				= "suboptimal";						/* Type of solution to seek: "feasible" (exit at 1st solution found), "suboptimal" (attempt to find "max_neighbors" # of solutions) */
 	char sampling[13]			= "halton";							/* Sampling sequence: "pseudorandom", "halton" */
 	char NN_alg[12]				= "brute_force";					/* Nearest neighbor algorithm: "brute_force", "kd_tree" (INOPERATIVE - BUG IN KDTREE LIBRARY) */
@@ -208,19 +208,17 @@ int main() {
 	int n_planes			= 1;									/* Number of planar obstacles */
 	double nhat_planes[]	= { 0.0, 0.0, -1.0 };					/* Plane unit-normal vectors (resolved in world frame) */
 	double xyz_planes[]		= { 0.0, 0.0, 2.4 };					/* Coordinates (resolved in world frame) of any point in the plane(s) [in] */
-	int n_cylinders			= 3;									/* Number of cylindrical obstacles */
-	double r_cylinders[]	= { 2.5, 1.8, 0.3 };							/* Cylinder radii [in] */
-	double H_cylinders[]	= { 2.0, 4.0, 2.5 };							/* Cylinder heights [in] */
+	int n_cylinders			= 2;									/* Number of cylindrical obstacles */
+	double r_cylinders[]	= { 2.5, 1.8 };							/* Cylinder radii [in] */
+	double H_cylinders[]	= { 2.0, 4.0 };							/* Cylinder heights [in] */
 	double YPR_cylinders[]	= { 0.0, 0.0, 0.0,						/* Yaw, pitch, and roll (rel. to world frame) of cylinder axes [deg] */
-								0.0, 0.0, 0.0, 
 								0.0, 0.0, 0.0 };
 	double xyz_cylinders[]	= { 0.0,	0.0,	2.01+H[0]/2 - H_cylinders[0]/2,		/* Coordinates (resolved in world frame) of cylinder centers [in] */
-								-5.5,	1.75,	2.01+H[0]/2 - H_cylinders[1]/2,
-								9.5*cos((PI/180)*25), 9.5*sin((PI/180)*25), 1.01+H[0]/2 - H_cylinders[2]/2 };
+								-5.5,	1.75,	2.01+H[0]/2 - H_cylinders[1]/2 };
 	int n_cuboids			= 1;									/* Number of cuboidal obstacles */
 	double YPR_cuboids[]	= { -25.0, 0.0, 0.0 };					/* Yaw, pitch, and roll (rel. to world frame) of cuboids [deg] */
-	double LWH_cuboids[]	= { 1.2, 0.75, 2.0 };					/* Length, width, and height of each cuboid [in] */
-	double xyz_cuboids[]	= { 7.5*cos((PI/180)*25), 7.5*sin((PI/180)*25), 1.01+H[0]/2 - LWH_cuboids[2]/2 };	/* Coordinates (resolved in world frame) of cuboid centers [in] */
+	double LWH_cuboids[]	= { 1.2, 0.75, 2.5 };					/* Length, width, and height of each cuboid [in] */
+	double xyz_cuboids[]	= { 9.5*cos((PI/180)*25), 9.5*sin((PI/180)*25), 1.01+H[0]/2 - LWH_cuboids[2]/2 };	/* Coordinates (resolved in world frame) of cuboid centers [in] */
 	int i_grip_obs			= 0;									/* Index of the cuboidal obstacle corresponding to the grasped object (0,1,2...) */
 
 	/* (4) Set manipulator hardware parameters (used during motion plan execution) */
@@ -230,8 +228,8 @@ int main() {
 	int sensor_channels[]		= { 0, 1, 2, 3, 4, 5 };				/* Temp sensor channels */
 	int n_tempsensors			= 6;								/* Number of temperature sensors on the sensing skin */
 	int rate_tempsensors		= 500;								/* Data rate of the temperature sensor board */
-	int max_replans				= 10000;								/* Maximum number of new plans to consider in the case that an original plan fails */
-	int max_replan_neighbors	= 500;								/* Maximum number of nearest-neighbors to use for replanning from a current state to each tree */
+	int max_replans				= 5000;								/* Maximum number of new plans to consider in the case that an original plan fails */
+	double max_replan_neighbors	= 25.0;								/* Percentage of tree nodes to use for replanning from a current state to each tree */
 	int max_replan_doubling		= 2;								/* Number of doublings to consider for replanning nearest neighbor search (k-nearest) */
 	double max_temp				= 200;								/* Maximum temperature allowed [deg C] */
 	double max_t_horizon		= 12.0;								/* Maximum horizon time [s] */
@@ -242,8 +240,8 @@ int main() {
 	double grip_AccelThrottle	= 0.01;								/* Set the acceleration the end effector actuator as a fraction from AccelMin to AccelMax */
 	double grip_VelLimThrottle	= 1.0;								/* Set the velocity limit of the end effector actuator as a fraction from VelMin to VelMax */
 	
-	//char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	//char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
 	//char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
 	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 4.0, 4.0, 4.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
 	double pos_y_tempsensors[]  = { 0.0, -1.3, 0.0, 0.0, -1.0, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
@@ -849,10 +847,12 @@ int main() {
 						
 						/* Double the number of nodes used in k-nearest replanning search.  If still unsafe, search again using more neighbors. */
 						doubling += 1;
+						max_replans *= 2;
 						max_replan_neighbors *= 2;
 
 					} while ((unsafe == 1) && (doubling <= max_replan_doubling));
 
+					max_replans = max_replans/( (int) pow(2.0, doubling) );
 					max_replan_neighbors = max_replan_neighbors/( (int) pow(2.0, doubling) );
 
 					// TODO ExhaustiveRePlan seems to be in error.  Do not use for now!

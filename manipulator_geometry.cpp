@@ -7,7 +7,7 @@ void TransformMatrix( double yaw, double pitch, double roll, double* trans, doub
 	pitch	= pitch*(PI/180);
 	roll	= roll*(PI/180);
 
-	T[0][0] = cos(pitch) * cos(roll);
+	T[0][0] = cos(pitch) * cos(yaw);
 	T[0][1] = cos(pitch) * sin(yaw);
 	T[0][2] = -sin(pitch);
 	T[0][3] = trans[0];

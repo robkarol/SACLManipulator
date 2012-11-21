@@ -802,20 +802,23 @@ void SaveBestPlans(int *num_replans, int max_replans, double cost_to_go, int tre
 	free(I);
 }
 
-int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int max_replans, int max_replan_neighbors, double eta_RRT, double gamma_RRT, int** replan_indices, char* NN_alg) {
+int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int max_replans, double max_replan_neighbors, double eta_RRT, double gamma_RRT, int** replan_indices, char* NN_alg) {
 	
 	double cost_to_go;
-	int num_replans = 0, n_neighbors = 0, cost_type = 2;
+	int num_replans = 0, n_neighbors = 0, cost_type = 2, n_neighborsA, n_neighborsB;
+	n_neighborsA = (int) ceil(max_replan_neighbors*n_nodes[0]);
+	n_neighborsB = (int) ceil(max_replan_neighbors*n_nodes[1]);
+
 	struct list_node *node_ptr;
 	double *replan_costs	= (double*) malloc(max_replans*sizeof(double));
-	int *neighbors			= (int*) malloc(max_replan_neighbors*sizeof(int));
-	double *costs			= (double*) malloc(max_replan_neighbors*sizeof(double));
+	int *neighbors			= (int*) malloc( max(n_neighborsA, n_neighborsB)*sizeof(int));
+	double *costs			= (double*) malloc( max(n_neighborsA, n_neighborsB)*sizeof(double));
 	int *I					= (int*) malloc(max_replans*sizeof(int));
 
 	// Cost-Priority Search
 	/* Find minimum-cost paths back to the forward tree.  Search the nearest neighbors in the forward tree from q, obtaining the number of candidates
 	n_neighbors, the cost to connect to each one, costs, and the location of each, neighbors.  Search according to NN_alg and the cost_type above. */
-	NearestNeighbors( T_ptrs[0], n_nodes[0], q, n, w, max_replan_neighbors, cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
+	NearestNeighbors( T_ptrs[0], n_nodes[0], q, n, w, n_neighborsA, cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
 	for (int k = 0; k < n_neighbors; k++) {
 
 		/* If the nearest neighbor node is safe, attempt to save the paths to which it connects */
@@ -841,7 +844,7 @@ int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int 
 	}
 
 	/* Find minimum-cost paths back to the reverse tree */
-	NearestNeighbors( T_ptrs[1], n_nodes[1], q, n, w, max_replan_neighbors, cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
+	NearestNeighbors( T_ptrs[1], n_nodes[1], q, n, w, n_neighborsB, cost_type, eta_RRT, gamma_RRT, neighbors, costs, &n_neighbors, NN_alg );
 	for (int k = 0; k < n_neighbors; k++) {
 		if ( T_ptrs[1]->safety[ neighbors[k] ] == 1 ) {
 			cost_to_go = costs[k] + T_ptrs[1]->costs[ neighbors[k] ];

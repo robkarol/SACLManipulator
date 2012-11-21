@@ -125,26 +125,32 @@ void GenerateObstacles( struct obstacles *obs, int n_planes, double* nhat_planes
 		CG[1]		= xyz_cuboids[3*i+1];
 		CG[2]		= xyz_cuboids[3*i+2];
 		double** T	= Make2DDoubleArray(4, 4);
-		TransformMatrix( YPR_cuboids[3*i], YPR_cuboids[3*i+1], YPR_cuboids[3*i+2], CG, T );
+		InvTransformMatrix( YPR_cuboids[3*i], YPR_cuboids[3*i+1], YPR_cuboids[3*i+2], CG, T );
 		cuboids->T[i] = T;
+
+		/* Intend a transformation to the cuboid frame by yaw-pitch-roll of the world frame, followed 
+		by translation v = CG of coordinates to cuboid center.  To transform cuboid planes a'x' + b'y' + c'z' + d' = 0
+		into the world frame (ax + by + cz + d = 0), we need to apply an inverse transformation to the vector [x' y' z'].
+		Note to invert the first rotation of the FRAME and not the coordinates, we must take the transpose of the usual result
+		Tinv = [R^-1, v^-1; 0, 1] --> need Tinv = [(R^-1)^-1, v^-1; 0, 1] = [R, v^-1; 0, 1]. */
 
 		/* Front face											Back face */
 		cuboids->a[6*i] = T[0][0];								cuboids->a[6*i+1] = -T[0][0];	
-		cuboids->b[6*i] = T[0][1];								cuboids->b[6*i+1] = -T[0][1];	
-		cuboids->c[6*i] = T[0][2];								cuboids->c[6*i+1] = -T[0][2];	
-		cuboids->d[6*i] = T[0][3] - LWH_cuboids[3*i]/2.0;		cuboids->d[6*i+1] = -T[0][3] + LWH_cuboids[3*i]/2.0;
+		cuboids->b[6*i] = T[1][0];								cuboids->b[6*i+1] = -T[1][0];	
+		cuboids->c[6*i] = T[2][0];								cuboids->c[6*i+1] = -T[2][0];	
+		cuboids->d[6*i] = T[0][3] - LWH_cuboids[3*i]/2.0;		cuboids->d[6*i+1] = -T[0][3] - LWH_cuboids[3*i]/2.0;
 
 		/* Right face											Left face */
-		cuboids->a[6*i+2] = T[1][0];							cuboids->a[6*i+3] = -T[1][0];
+		cuboids->a[6*i+2] = T[0][1];							cuboids->a[6*i+3] = -T[0][1];
 		cuboids->b[6*i+2] = T[1][1];							cuboids->b[6*i+3] = -T[1][1];
-		cuboids->c[6*i+2] = T[1][2];							cuboids->c[6*i+3] = -T[1][2];
-		cuboids->d[6*i+2] = T[1][3] - LWH_cuboids[3*i+1]/2.0;	cuboids->d[6*i+3] = -T[1][3] + LWH_cuboids[3*i+1]/2.0;
+		cuboids->c[6*i+2] = T[2][1];							cuboids->c[6*i+3] = -T[2][1];
+		cuboids->d[6*i+2] = T[1][3] - LWH_cuboids[3*i+1]/2.0;	cuboids->d[6*i+3] = -T[1][3] - LWH_cuboids[3*i+1]/2.0;
 
 		/* Top face												Bottom face */
-		cuboids->a[6*i+4]  = T[2][0];							cuboids->a[6*i+5]  = -T[2][0];
-		cuboids->b[6*i+4]  = T[2][1];							cuboids->b[6*i+5]  = -T[2][1];
+		cuboids->a[6*i+4]  = T[0][2];							cuboids->a[6*i+5]  = -T[0][2];
+		cuboids->b[6*i+4]  = T[1][2];							cuboids->b[6*i+5]  = -T[1][2];
 		cuboids->c[6*i+4]  = T[2][2];							cuboids->c[6*i+5]  = -T[2][2];
-		cuboids->d[6*i+4]  = T[2][3] - LWH_cuboids[3*i+2]/2.0;	cuboids->d[6*i+5]  = -T[2][3] + LWH_cuboids[3*i+2]/2.0;
+		cuboids->d[6*i+4]  = T[2][3] - LWH_cuboids[3*i+2]/2.0;	cuboids->d[6*i+5]  = -T[2][3] - LWH_cuboids[3*i+2]/2.0;
 	}
 
 	/* Re-position the cuboidal obstacle corresponding to the grasped object to the final element of "cuboids" (for easy removal later) */

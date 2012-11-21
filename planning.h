@@ -168,14 +168,14 @@ void SaveBestPlans(int *num_replans, int max_replans, double cost_to_go, int tre
 	
 
 /*! Replan according to the shortest-distance paths that do not currently violate obstacle constraints.  *Cost-Priority Search*: Generates a sorted list of potential re-plan paths
-according to the shortest-paths among all possible paths through the set of *max_replan_neighbors* number of nearest-neighbors in each tree.  Note this does
-not conduct a full search, nor does it compute the globally-shortest path (but merely the globally shortest path among the set of locally closest safe nodes).
+according to the shortest-paths among all possible paths through the set of *max_replan_neighbors* percent of nearest-neighbors in each tree.  Note this does not conduct 
+a full search (unless set to 100%), nor does it necessarily compute feasible paths (but merely the globally shortest *unconstrained* path among the set of locally closest safe nodes).
 \see SaveBestPlans, FindSafePath, ExhaustiveRePlan
 	\param[in]		max_replans				Maximum number of cost-priority re-plan paths to search for
-	\param[in]		max_replan_neighbors	Maximum number of replan neighbors to use during search, for each tree (forward and reverse)
+	\param[in]		max_replan_neighbors	Percent of tree nodes to use during a replan search (same for each tree, forward and reverse)
 	\param[in,out]	replan_indices			Pre-allocated list of size *max_replans*\f$\times3\f$, used to store indices of re-plan paths (see `SaveBestPlans`).
 	\returns The number of re-plan paths found and stored in *replan_indices* */
-int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int max_replans, int max_replan_neighbors, double eta_RRT, double gamma_RRT, int** replan_indices, char* NN_alg);
+int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int max_replans, double max_replan_neighbors, double eta_RRT, double gamma_RRT, int** replan_indices, char* NN_alg);
 
 
 /*! Reconstructs the best safe path produced by `RePlan` and/or `ExhaustiveRePlan`. Finds a safe path (that satisfies obstacle constraints) given the 
