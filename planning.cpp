@@ -6,6 +6,7 @@
 #include "sorting.h"
 #include "obstacles.h"
 #include "collision_detection.h"
+#include "log.h"
 
 void Halton( int* sequence, int length, int D, double** h ) {
 	/* Returns "num" vectors of double pointers of length D to h, listed according to the Halton sequence */
@@ -532,7 +533,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 		Thus, all nodes directly connected to the other tree have in their "leaf_list" the index of the node in the other 
 		tree to which they are connected.  All nodes not directly connected to the other tree have in their "leaf_list" a list of
 		all their descendent nodes that do directly connect to the other tree. */
-		printf("\t%s\n", "Saving connected leaf nodes to leaf lists...");
+		LOG(logINFO) << "Saving connected leaf nodes to leaf lists...";
 		trees[0]	= Ta;		num_nodes[0]	= num_nodesA;
 		trees[1]	= Tb;		num_nodes[1]	= num_nodesB;
 		for (int k = 0; k < 2; k++) {
@@ -544,7 +545,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 		}
 
 		/* Output the two trees to file */
-		printf("\t%s\n", "Writing tree data to files...");
+		LOG(logINFO) << "Writing tree data to files...";
 		if (I == 0) {
 			remove( strcat(filename, "trees.dat") );
 			filename[strlen(filename)-9] = NULL;
@@ -582,7 +583,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 		char c;
 
 		/* Load the two trees from file */
-		printf("\t%s\n", "Loading tree data from files...");
+		LOG(logINFO) << "Loading tree data from files...";
 		treefile = fopen(strcat(filename, "trees.dat"), "r");		/* Open tree file for reading */
 
 		if(treefile != NULL)
@@ -637,7 +638,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 
 		else
 		{
-			printf("ERROR: could not open tree file.\n");
+			LOG(logERROR) << "Could not open tree file.";
 		}
 		filename[strlen(filename)-9] = NULL;
 
@@ -1066,7 +1067,8 @@ void ResetSimulation( char reset_trees, struct tree* trees, int n_trees, int n_p
 void GenerateSamples(double** Q, char* sampling, int n, int max_iter, double* q_max, double* q_min, char* filename) {
 	
 	FILE *samplefid;
-	samplefid = fopen( strcat(filename, "samples.dat"), "w+");
+	char* sampleFile = strcat(filename, "samples.dat");
+	samplefid = fopen( sampleFile, "w+");
 
 	if(samplefid != 0)	// check if file could be opened
 	{
@@ -1105,7 +1107,7 @@ void GenerateSamples(double** Q, char* sampling, int n, int max_iter, double* q_
 	}
 	else
 	{
-		printf("ERROR: could not open sample file.\n");
+		LOG(logERROR) << "Could not open sample file ["<<sampleFile<<"]";
 	}
 	filename[strlen(filename)-11] = NULL;
 
