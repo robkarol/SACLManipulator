@@ -115,6 +115,10 @@ variant of the `RRT*-Connect` Algorithm that has been adapted for fast re-planni
 #include "kdtree.h"
 #include "matlab_interface.h"
 #include "phidget_interface.h"
+#include <iostream>
+#include <stdio.h>
+
+using namespace std;
 
 #pragma warning (disable : 4996)
 /*! Suppress compiler warnings about deprecated functions, e.g.\ `strcpy` (warning C4996) */
@@ -136,55 +140,87 @@ int main() {
 	/* (1) Define general user settings */
 	char load_previous			= 'y';								/* Load a previous run? (y/n) */
 	char disp_matlab_plots		= 'y';								/* Display MATLAB plots? (y/n/a) [a = "all" (also plots RRT figures, which is very time-consuming)] */
-	//char filename[FILENAME_MAX]	= "C:/Users/user/Desktop/SACL/RRT1";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
-	char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
+	char reset_trees			= 'n';								/* Reset the trees during simulation resets? (y/n) */
+	char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
+	//char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
+	//char filename[FILENAME_MAX] = "C:/Users/Joe/Desktop/SACL/RRT";
 	char soln[11]				= "suboptimal";						/* Type of solution to seek: "feasible" (exit at 1st solution found), "suboptimal" (attempt to find "max_neighbors" # of solutions) */
 	char sampling[13]			= "halton";							/* Sampling sequence: "pseudorandom", "halton" */
 	char NN_alg[12]				= "brute_force";					/* Nearest neighbor algorithm: "brute_force", "kd_tree" (INOPERATIVE - BUG IN KDTREE LIBRARY) */
-	int max_iter				= 2500;								/* Maximum number of iterations to use for pre-computation */
+	int max_iter				= 2000;								/* Maximum number of iterations to use for pre-computation */
 	int	max_neighbors			= 150;								/* Maximum number of re-wiring neighbors (1 for none, max_iter for full tree) */
 	double epsilon				= 2.0;								/* Angular resolution of trees, and tolerance for path execution [deg] */
 
 	/* (2) Specify manipulator waypoints, and define manipulator geometry */
-	int n					= 4;									/* Dimension of manipulator C-space */
-	int n_waypoints			= 4;									/* Number of waypoints to traverse ( must be >= 2, initial and goal ) */
-	double q_waypoints[]	= { 45.063-20.0,	97.429-20.0,	159.777-20.0,	185.92-20.0,		/* Joint configuration waypoints [deg], */
-								45.063-20.0,	89.35-20.0,		140.69-20.0,	174.89-20.0,		/*		specified in "n_waypoints" groups of "n" doubles */
-								174.88-20.0,	155.73-20.0,	166.777-20.0,	132.598-20.0,
-								45.063-20.0,	97.429-20.0,	159.777-20.0,	185.92-20.0 };	
-	double w[]				= { 1.0, 6.68, 10.5, 2.2 };				/* Weighting parameters (scale factors) to use for the weighted Euclidean distance metric */
-	double grip_angles[3]	= { 20.0-20.0, 125.3-20.0, 55.2-20.0 };	/* "Default", "Grasp mode", and "Drop mode" actuator angles for the gripper [deg] */
-	int	   grip_actions[2]	= { 1, 2 };								/* Waypoint indices after which "Grasp mode" and "Drop mode" should be implemented (0,1,2,...) */
-	double grip_pos[3]		= { 0.0, -3.5, 0.0 };					/* Body-fixed position of the end-effector (w.r.t. link "n") [in] (used mainly for traj. visualization) */ 
-	double q_min[]			= { 0.0, 0.0, 0.0, 0.0 };				/* Minimum bounds on joint angles [deg] */
-	double q_max[]			= { 180.0, 180.0, 180.0, 180.0 };		/* Maximum bounds on joint angles [deg] */
-	double L[]				= { 3.25, 6.68, 10.5, 2.2 };			/* Lengths	(x along each body-fixed 0 deg line)	of each link [in] */
-	double W[]				= { 2.4, 1.0, 1.75, 4.0 };				/* Widths	(y completes the RHR)					of each link [in] */
-	double H[]				= { 1.0, 3.3, 2.25, 2.75 };				/* Heights	(z along each body-fixed rotation axis) of each link [in] */
-	double rho_x[]			= { -2.375, -0.4, -2.0, -1.575 };		/* Body-fixed x-position of back-left, bottom corner of cuboid OBB's (w.r.t. their body-fixed origin) [in] */
-	double rho_y[]			= { -1.2, -0.5, -1.15, -3.5 };			/* Body-fixed y-position of back-left, bottom corner of cuboid OBB's (w.r.t. their body-fixed origin) [in] */							
-	double rho_z[]			= { -0.5, -1.65, -1.125, -1.375 };		/* Body-fixed z-position of back-left, bottom corner of cuboid OBB's (w.r.t. their body-fixed origin) [in] */
-	double d[]				= { 0, 0, 0, 0 };						/* Denavit-Hartenberg (DH) parameter: translation along the z_i (rotation) axes [in] (p.103 LaValle) */
-	double a[]				= { 0, 0, 6.75, 8.25 };					/* Denavit-Hartenberg (DH) parameter: translation along the x_i-1 (perp) axes [in] (p.103 LaValle) */
-	double alpha[]			= { 0, -90, 180, 180 };					/* Denavit-Hartenberg (DH) parameter: rotation angles about x_i-1 (perp) axes [deg] (p.103 LaValle) */
-	int	   n_facepts[]		= { 0, 0, 0, 5, 0, 10,					/* Number of additional points (besides corner points) to use for cuboid OBB's, specified in */
-								20, 0, 20, 30, 0, 0 };				/*		groups of 3 for each link (for faces || to the body-fixed xy, yz, and xz respectively) */
+	int n					= 4;											/* Dimension of manipulator C-space (number of links) */
+	int n_waypoints			= 4;											/* Number of waypoints to traverse ( must be >= 2, initial and goal ) */
+	//double q_waypoints[]	= { 45.063-20.0,	110.429-20.0,	159.777-20.0,	185.92-20.0,		/* Joint configuration waypoints [deg], */
+	//							45.063-20.0,	86.35-20.0,		132.8-20.0,		160.777-20.0,		/*		specified in "n_waypoints" groups of "n" doubles */
+	//							174.88-20.0,	147.73-20.0,	154.777-20.0,	113.598-20.0,
+	//							45.063-20.0,	110.429-20.0,	159.777-20.0,	185.92-20.0 };
+
+	double q_waypoints[]	= { 45.063-20.0,	110.429-20.0,	159.777-20.0,	185.92-20.0,		/* Joint configuration waypoints [deg], */
+								25.0, 72.0, 120.0, 138.0,		/*		specified in "n_waypoints" groups of "n" doubles */
+								174.88-20.0,	147.73-20.0,	154.777-20.0,	113.598-20.0,
+								45.063-20.0,	110.429-20.0,	159.777-20.0,	185.92-20.0 };
+
+	//double q_waypoints[]	= { 31.063-20.0,	91.429-20.0,	159.777-20.0,	185.92-20.0,		/* Joint configuration waypoints [deg], */
+	//							31.063-20.0,	80.35-20.0,		138.69-20.0,	174.89-20.0,		/*		specified in "n_waypoints" groups of "n" doubles */
+	//							178.88-20.0,	147.73-20.0,	154.777-20.0,	113.598-20.0,
+	//							31.063-20.0,	91.429-20.0,	159.777-20.0,	185.92-20.0 };
+	//double q_waypoints[]	= { 45.063-20.0,	97.429-20.0,	159.777-20.0,	185.92-20.0,		/* Joint configuration waypoints [deg], */
+	//							45.063-20.0,	89.35-20.0,		140.69-20.0,	174.89-20.0,		/*		specified in "n_waypoints" groups of "n" doubles */
+	//							174.88-20.0,	155.73-20.0,	166.777-20.0,	132.598-20.0,
+	//							45.063-20.0,	97.429-20.0,	159.777-20.0,	185.92-20.0 };
+
+	double q_emergency []   = {
+		155, 128, 125, 94,
+		145, 130, 127, 103,
+		130, 130, 130, 110,
+		115, 120, 135, 117,
+		100, 113, 144, 124,
+		90,	 113.5, 146, 131,
+		85,  105.0,	148, 138,
+		25,  93.5,	154, 159};
+
+	int n_emergency = 8;
+
+	int	   grip_actions[2]	= { 1, 2 };										/* Waypoint indices after which "Grasp mode" and "Drop mode" should be implemented (0,1,2,...) */
+	double grip_angles[3]	= { 20.0-20.0, 125.3-20.0, 55.2-20.0 };			/* "Default", "Grasp mode", and "Drop mode" actuator angles for the gripper [deg] */
+	double grip_sep[3]		= { 1.0, 0.75, 0.85 };							/* Separation between end-effector tips during "Default", "Grasp mode", and "Drop mode" phases [in] (assumed to lie along link n's body-fixed z-axis -- see BodyFixedOBBcoords) */
+	double grip_pos[3]		= { 0.0, -3.35, 0.0 };							/* Body-fixed position of the end-effector center (w.r.t. link "n") [in] (used for traj. visualization and tip representation) */ 
+	double q_min[]			= { 0.0, 0.0, 20.0, 0.0 };						/* Minimum bounds on joint angles [deg] */
+	double q_max[]			= { 180.0, 150.0, 180.0, 180.0 };				/* Maximum bounds on joint angles [deg] */
+	double L[]				= { 3.5, 6.89, 10.4, 2.2, 0.8, 0.8 };			/* Lengths	(x along each body-fixed 0 deg line)	\																*/
+	double W[]				= { 3.4, 1.0, 1.8, 2.75, 1.2, 1.2 };			/* Widths	(y completes the RHR)					 } of each link and end effector tip (right then left) [in]		*/
+	double H[]				= { 1.4, 3.45, 2.6, 2.8, 0.6, 0.6 };			/* Heights	(z along each body-fixed rotation axis) /		(end effector geometry w.r.t. final link coord system)	*/
+	double rho_x[]			= { -2.31,		-W[1]/2,	-2.35,		0.58-L[3],	grip_pos[0]-L[4]/2,	grip_pos[0]-L[5]/2 };	/* Body-fixed x-position \																		*/
+	double rho_y[]			= { -W[0]/2,	-W[1]/2,	0.575-W[2], 0.5-W[3],	grip_pos[1],		grip_pos[1] };			/* Body-fixed y-position  } of back-left, bottom corner of link and end-effector tip OBB's [in]	*/							
+	double rho_z[]			= { -H[0]/2,	-H[1]/2,	-H[2]/2,	-H[3]/2,	grip_pos[2],		grip_pos[2]-H[5] };		/* Body-fixed z-position /     (w.r.t. their body-fixed origins, gripper fully-closed) 			*/
+	double d[]				= { 0, 0, 0, 0 };								/* Denavit-Hartenberg (DH) parameter: translation along the z_i (rotation) axes [in] (p.103 LaValle) */
+	double a[]				= { 0, 0, 5.765, 7.3 };							/* Denavit-Hartenberg (DH) parameter: translation along the x_i-1 (perp) axes [in] (p.103 LaValle) */
+	double alpha[]			= { 0, -90, 180, 180 };							/* Denavit-Hartenberg (DH) parameter: rotation angles about x_i-1 (perp) axes [deg] (p.103 LaValle) */
+	double w[]				= { L[0], L[1], L[2], L[3] };					/* Weighting parameters (scale factors) to use for the weighted Euclidean distance metric */
+	int	   n_facepts[]		= { 0, 0, 0,	5, 0, 10,		20, 0, 20,		/* Number of additional points (besides corner points) to use for cuboid OBB's, specified in */
+								25, 20, 20,	 5, 5, 5,		5, 5, 5 };	/*		groups of 3 for each link and end effector tip (for faces || to the body-fixed xy, yz, and xz respectively) */
 
 	/* (3) Define static obstacle regions (plane: f = dot(nhat,[x,y,z]) + d < 0, cylinder: f = r - R < 0, cuboid: union of six planes)*/
 	int n_planes			= 1;									/* Number of planar obstacles */
 	double nhat_planes[]	= { 0.0, 0.0, -1.0 };					/* Plane unit-normal vectors (resolved in world frame) */
-	double xyz_planes[]		= { 0.0, 0.0, 2.5 };					/* Coordinates (resolved in world frame) of any point in the plane(s) [in] */
-	int n_cylinders			= 2;									/* Number of cylindrical obstacles */
-	double r_cylinders[]	= { 2.5, 1.5 };							/* Cylinder radii [in] */
-	double H_cylinders[]	= { 2.0, 4.2 };							/* Cylinder heights [in] */
+	double xyz_planes[]		= { 0.0, 0.0, 2.4 };					/* Coordinates (resolved in world frame) of any point in the plane(s) [in] */
+	int n_cylinders			= 3;									/* Number of cylindrical obstacles */
+	double r_cylinders[]	= { 2.5, 1.8, 0.3 };							/* Cylinder radii [in] */
+	double H_cylinders[]	= { 2.0, 4.0, 2.5 };							/* Cylinder heights [in] */
 	double YPR_cylinders[]	= { 0.0, 0.0, 0.0,						/* Yaw, pitch, and roll (rel. to world frame) of cylinder axes [deg] */
+								0.0, 0.0, 0.0, 
 								0.0, 0.0, 0.0 };
-	double xyz_cylinders[]	= { 0.0, 0.0, 2.7 - 2.0/2,				/* Coordinates (resolved in world frame) of cylinder centers [in] */
-								-5.5, 1.75, 2.7 - 4.2/2 };
+	double xyz_cylinders[]	= { 0.0,	0.0,	2.01+H[0]/2 - H_cylinders[0]/2,		/* Coordinates (resolved in world frame) of cylinder centers [in] */
+								-5.5,	1.75,	2.01+H[0]/2 - H_cylinders[1]/2,
+								9.5*cos((PI/180)*25), 9.5*sin((PI/180)*25), 1.01+H[0]/2 - H_cylinders[2]/2 };
 	int n_cuboids			= 1;									/* Number of cuboidal obstacles */
-	double YPR_cuboids[]	= { -30.0, 0.0, 0.0 };					/* Yaw, pitch, and roll (rel. to world frame) of cuboids [deg] */
-	double LWH_cuboids[]	= { 1.0, 0.6, 2.0 };					/* Length, width, and height of each cuboid [in] */
-	double xyz_cuboids[]	= { 10.0, 10.0*sin(PI/6), 2.5 - 1.0 };	/* Coordinates (resolved in world frame) of cuboid centers [in] */
+	double YPR_cuboids[]	= { -25.0, 0.0, 0.0 };					/* Yaw, pitch, and roll (rel. to world frame) of cuboids [deg] */
+	double LWH_cuboids[]	= { 1.2, 0.75, 2.0 };					/* Length, width, and height of each cuboid [in] */
+	double xyz_cuboids[]	= { 7.5*cos((PI/180)*25), 7.5*sin((PI/180)*25), 1.01+H[0]/2 - LWH_cuboids[2]/2 };	/* Coordinates (resolved in world frame) of cuboid centers [in] */
 	int i_grip_obs			= 0;									/* Index of the cuboidal obstacle corresponding to the grasped object (0,1,2...) */
 
 	/* (4) Set manipulator hardware parameters (used during motion plan execution) */
@@ -194,22 +230,24 @@ int main() {
 	int sensor_channels[]		= { 0, 1, 2, 3, 4, 5 };				/* Temp sensor channels */
 	int n_tempsensors			= 6;								/* Number of temperature sensors on the sensing skin */
 	int rate_tempsensors		= 500;								/* Data rate of the temperature sensor board */
-	int max_replans				= 300;								/* Maximum number of new plans to consider in the case that an original plan fails */
-	int max_replan_neighbors	= 100;								/* Maximum number of nearest-neighbors to use for replanning from a current state to each tree */
+	int max_replans				= 10000;								/* Maximum number of new plans to consider in the case that an original plan fails */
+	int max_replan_neighbors	= 500;								/* Maximum number of nearest-neighbors to use for replanning from a current state to each tree */
+	int max_replan_doubling		= 2;								/* Number of doublings to consider for replanning nearest neighbor search (k-nearest) */
 	double max_temp				= 200;								/* Maximum temperature allowed [deg C] */
-	double max_t_horizon		= 15.0;								/* Maximum horizon time [s] */
-	double max_t_rebuild		= 30.0;								/* Maximum time allowed to re-build trees in a last-ditch attempt to find a safe path (must be >= max_t_horizon) */
+	double max_t_horizon		= 12.0;								/* Maximum horizon time [s] */
+	double max_t_rebuild		= 60.0;								/* Maximum time allowed to re-build trees in a last-ditch attempt to find a safe path (must be >= max_t_horizon) */
 	double t_tempwait			= 6.0;								/* Time to wait for temperature sensor estimation algorithm [s] */
 	double AccelThrottle[]		= { 0.3, 0.3, 0.3, 0.3 };			/* Set the accelerations of each link actuator as a fraction from AccelMin to AccelMax */
 	double VelLimThrottle[]		= { 0.002, 0.002, 0.002, 0.002 };	/* Set the velocity limits of each link actuator as a fraction from VelMin to VelMax */
 	double grip_AccelThrottle	= 0.01;								/* Set the acceleration the end effector actuator as a fraction from AccelMin to AccelMax */
 	double grip_VelLimThrottle	= 1.0;								/* Set the velocity limit of the end effector actuator as a fraction from VelMin to VelMax */
 	
-	char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	// char	tempsensor_file[]	= "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 5.0, 5.0, 5.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
-	double pos_y_tempsensors[]  = { 0.0, -1.15, 0.0, 0.0, -1.15, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
-	double pos_z_tempsensors[]  = { 1.125, 0.0, -1.125, 1.125, 0.0, -1.125 };	/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
+	//char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	//char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
+	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 4.0, 4.0, 4.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
+	double pos_y_tempsensors[]  = { 0.0, -1.3, 0.0, 0.0, -1.0, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
+	double pos_z_tempsensors[]  = { 1.25, 0.0, -1.25, 0.9, 0.0, -0.9 };			/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
 	double n_x_tempsensors[]	= { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-component of the outward-pointing normal vectors at each simulated temperature sensor */
 	double n_y_tempsensors[]	= { 0.0, -1.0, 0.0, 0.0, -1.0, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-component of the outward-pointing normal vectors at each simulated temperature sensor */
 	double n_z_tempsensors[]	= { 1.0, 0.0, -1.0, 1.0, 0.0, -1.0 };			/* Potentiometer simulation: "sensor_link" body-fixed z-component of the outward-pointing normal vectors at each simulated temperature sensor */
@@ -218,11 +256,11 @@ int main() {
 	double r_tempobs			= 0.5;			/* Radius at sensor position of truncated-cone temperature obstacle(s) [in] */
 	double offset_tempobs		= 1.5;			/* Normal offset from the sensor at which to begin the cone */
 	double H_tempobs			= 5;			/* Height of truncated-cone temperature obstacle(s) located above the sensor [in] */
-	double beta_tempobs			= 15;			/* Half-angle of truncated-cone temperature obstacle(s) [deg] */
+	double beta_tempobs			= 2;			/* Half-angle of truncated-cone temperature obstacle(s) [deg] */
 	double	t_obs_intro[]		= {  10, 20};		/* Time at which any artificial temperature obstacles are introduced (must be in ascending order) [s] */
 	int		obs_sensor[]		= {  2, 5};		/* Sensors that "detect" fake temperature obstacles at the times above (1,2,3... - enter NULLs for no obstacles) */
-	int		n_fakeobs			= 2;			/* Total number of artificial temperature sensor violations */
-	int		n_tempobs_max		= 2;			/* Maximum number of temperature obstacles allowed */
+	int		n_fakeobs			= 0;			/* Total number of artificial temperature sensor violations */
+	int		n_tempobs_max		= 1;			/* Maximum number of temperature obstacles allowed */
 
 	// Demos: 8.0 s, 6		10.0 s, 2		11.0 s, 5		8.0,13.0 6,5
 
@@ -234,10 +272,10 @@ int main() {
 	assert((strncmp(sampling, "halton", 6) == 0			|| strncmp(sampling, "pseudorandom", 12) == 0)		&& strchr( filename, '.' ) == NULL );
 	assert( grip_AccelThrottle >= 0		&& grip_AccelThrottle <= 1	&& grip_VelLimThrottle >= 0				&& grip_VelLimThrottle <= 1 );
 	assert( Numel(grip_actions) == 2	&& grip_actions[0] >= 0		&& grip_actions[1] > grip_actions[0]	&& grip_actions[1] <= n_waypoints-1 );
-	assert( Numel(grip_angles) == 3		&& n_waypoints >= 2			&& n >= 1		&& epsilon > 0			&& Numel(n_facepts) == 3*n );
+	assert( Numel(grip_angles) == 3		&& n_waypoints >= 2			&& n >= 1		&& epsilon > 0			&& Numel(n_facepts) == 3*(n+2) );
 	assert( max_iter > 0		&& max_neighbors <= max_iter		&& max_replan_neighbors <= max_iter		&& sensor_link >= 1			&& Numel(w) == n );
 	assert( i_grip_obs >= 0		&& i_grip_obs <= n_cuboids-1		&& max_t_rebuild > max_t_horizon );
-	assert( Numel(L) == n		&& Numel(W) == n		&& Numel(H) == n		&& Numel(rho_x) == n		&& Numel(rho_y) == n		&& Numel(rho_z) == n );
+	assert( Numel(L) == n+2		&& Numel(W) == n+2		&& Numel(H) == n+2		&& Numel(rho_x) == n+2		&& Numel(rho_y) == n+2		&& Numel(rho_z) == n+2 );
 	assert( Numel(d) == n		&& Numel(a) == n		&& Numel(alpha) == n	&& max_t_horizon > 0		&& max_temp > 0				&& Numel(grip_pos) == 3 );
 	assert( Numel(q_min) == n	&& Numel(q_max) == n	&& Numel(q_waypoints) == n_waypoints*n );
 	assert( Numel(nhat_planes) == 3*n_planes			&& Numel(xyz_planes) == 3*n_planes );
@@ -253,17 +291,37 @@ int main() {
 
 	/* Print input values to file (to be used by the visualization code in MATLAB) and/or load previous input values */
 	GenerateInput( filename, soln, sampling, &max_iter, &max_neighbors, &epsilon, &n, &n_waypoints, q_waypoints, q_min, q_max,
-		grip_actions, grip_angles, n_facepts, L, W, H, rho_x, rho_y, rho_z, d, a, alpha, &n_planes, nhat_planes, xyz_planes,
+		grip_actions, grip_angles, grip_sep, grip_pos, n_facepts, L, W, H, rho_x, rho_y, rho_z, d, a, alpha, &n_planes, nhat_planes, xyz_planes,
 		&n_cylinders, YPR_cylinders, xyz_cylinders, r_cylinders, H_cylinders, &n_cuboids, YPR_cuboids, LWH_cuboids, xyz_cuboids, load_previous );
+
+	max_t_horizon			= 1000*max_t_horizon;		// Convert the horizon time to milliseconds
+	max_t_rebuild			= 1000*max_t_rebuild;		// Convert the maximum rebuild time into milliseconds
 
 	/* Create a structure for storage of link geometry */
 	printf("Creating structures for input variable storage...\n");
 	struct geom *G	= (struct geom*) malloc( sizeof(struct geom) );
 	G->L			= L;			G->W		= W;			G->H			= H;
 	G->rho_x		= rho_x;		G->rho_y = rho_y;			G->rho_z		= rho_z;
-	G->Body_coords	= (double***) malloc( n*sizeof(double**) );
-	G->N_coords		= (int*) malloc( n*sizeof(int) );
-	BodyFixedOBBcoords( G, n_facepts, grip_pos, n );
+	
+	// allocation of 3D double array
+	// TODO: check if that should really be a 3D array
+	G->Body_coords	= (double***) malloc( ((n+1)+1)*sizeof(double**) );	// +1 due to operations in BodyFixedOBBcoords
+	// would have to be allocated if copied to this memory
+	/*for (int i = 0; i <= n+1; i++) 
+	{
+		G->Body_coords[i] = (double**) malloc(3*sizeof(double*));
+		for(int j = 0; j < 3; j++)
+		{
+			G->Body_coords[i][j] = (double*) malloc(sizeof(double));
+		}
+	}*/
+
+
+	//G->Body
+
+
+	G->N_coords		= (int*) malloc( ((n+1)+1)*sizeof(int) ); // +1 due to operations in BodyFixedOBBcoords
+	BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[0], n );
 
 	/* Create a DH parameters structure */
 	struct DHparams *DH = (struct DHparams*) malloc( sizeof(struct DHparams) );
@@ -392,9 +450,15 @@ int main() {
 		assert( kd_insert(trees[2*i+0].kd_tree, trees[2*i+0].nodes[0], const_cast<int*>(&(trees[2*i+0].indices[0])) ) == NULL );		// Returns NULL when no errors are encountered
 		assert( kd_insert(trees[2*i+1].kd_tree, trees[2*i+1].nodes[0], const_cast<int*>(&(trees[2*i+1].indices[0])) ) == NULL );
 
-		/* If considering the motion plan after the grasping maneuver, remove the battery from consideration as a cuboidal obstacle */
+		/* If considering the motion plan after the grasping maneuver, remove the battery from consideration as a cuboidal obstacle and update end-effector OBB's */
 		if ( i == grip_actions[0] ) {
+			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[1], n );
 			obs->n_cuboids = obs->n_cuboids - 1;
+		}
+
+		/* If considering the motion plan after the dropping maneuver, update the end-effector OBB's to their final position */
+		if ( i == grip_actions[1] ) {
+			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[2], n );
 		}
 
 		/* Build the forward and backward RRT's */
@@ -415,8 +479,15 @@ int main() {
 	/*+=======================================================================+*/
 	BEGIN_MOTION_CONTROL:
 
-	if ( grip_actions[0] == 0 || feasible[ grip_actions[0]-1 ] == 1 ) {
-		obs->n_cuboids		= obs->n_cuboids + 1;		// Reset all cuboids, in case replanning is necessary
+	if ( grip_actions[0] == 0 || feasible[ grip_actions[0]-1 ] == 1 ) { // reset battery if it has been picked up
+		obs->n_cuboids		= obs->n_cuboids + 1;						// Reset all cuboids, in case replanning is necessary
+		BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[0], n );	// Reset the end-effector OBB's
+	}
+
+	/* Store the original numbers of nodes in pre-computed RRTs, to be used when resetting the simulation if desired */
+	int* num_nodes_precomputed	= (int*) malloc( n_trees*sizeof(int) );
+	for (int i = 0; i < n_trees; i++) {
+		num_nodes_precomputed[i] = num_nodes[i];
 	}
 
 	/* Generate MATLAB plots */
@@ -433,7 +504,7 @@ int main() {
 
 		/* Open a figure in MATLAB for the end effector path plot */
 		assert( SendArraysToMATLAB( __LINE__, matlab, 5,	"n", Int,0, 1,1,1, n,		"n_cylinders", Int,0, 1,1,1, obs->n_cylinders,	
-			"n_cuboids", Int,0, 1,1,1, obs->n_cuboids,		"n_planes", Int,0, 1,1,1, obs->n_planes,		 "N_coords", Int,1, 1,1,n, G->N_coords ) == EXIT_SUCCESS );
+			"n_cuboids", Int,0, 1,1,1, obs->n_cuboids,		"n_planes", Int,0, 1,1,1, obs->n_planes,		 "N_coords", Int,1, 1,1,n+2, G->N_coords ) == EXIT_SUCCESS );
 		engEvalString( matlab,
 			"end_eff_path = double.empty(0,3);	end_eff_pathlen = 0;			end_eff_path_indices	= 0;	figdims = [0.5, 0.75];												\
 			obs_color = [192 192 192]./256;		obs_alpha = 0.6;				az_el = [24,32];				fontsize = 12;		titlesize = 14;									\
@@ -491,7 +562,10 @@ int main() {
 		for (int i = 0; i < n_plans; i++) {
 			if (feasible[i] != 1) break;
 			if (i == grip_actions[0]) {
+				BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[1], n );
 				obs->n_cuboids = obs->n_cuboids - 1;
+			} else if (i == grip_actions[1]) {
+				BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[2], n );
 			}
 
 			pathA	= TracePath( &trees[2*i+0], node_star_index[i][0], 0, &pathlenA );
@@ -538,8 +612,6 @@ int main() {
 	int **replan_indices	= Make2DIntArray(max_replans,3);
 	int* temp				= (int*) malloc(n_tempsensors*sizeof(int));
 	obs_indicator			= 2;						// For any new nodes during feedback, check both static and dynamic obstacles for constraint violations.
-	max_t_horizon			= max_t_horizon*1000;		// Convert the horizon time to milliseconds
-	max_t_rebuild			= max_t_rebuild*1000;		// Convert the maximum rebuild time into milliseconds
 	FILE* file_ptr;										// File pointer for reading in temperature sensor normal vectors
 	clock_t t_beginmotion, t_current;					// Timers for updating the trajectory after each fixed horizon time
 
@@ -585,6 +657,7 @@ int main() {
 		
 		/* Command the gripper open-loop according to pre-determined manual settings */
 		if (i == grip_actions[0]) {
+			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[1], n );
 			obs->n_cuboids = obs->n_cuboids - 1;		// Remove the grasped object from consideration in obstacle collisions
 			
 			printf("\tGrasping target object...\n");
@@ -594,6 +667,8 @@ int main() {
 			} while ( fabs( Command2Deg(q_grip) - grip_angles[1]) > epsilon );
 		}
 		else if (i == grip_actions[1]) {
+			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[2], n );
+
 			printf("\tDropping target object...\n");
 			CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[2]));
 			do { 
@@ -627,15 +702,18 @@ int main() {
 
 			/* While the current position is not equal (within epsilon) of the desired position, repeatedly examine
 			the path and assign a new plan mid-course if a temperature obstacle is encountered */
+			int emergency_plan_bool = 0;
 			do {
 				/* Check temperature sensors */
 				violation	= 0;
 				ready_flag	= 0;
 				if ( obs->n_temp_zones < n_tempobs_max ) {
 					if (file_ptr != NULL) {
+						/* The system will attempt to read temperature violation flags from the tempsensor file. */
 						rewind(file_ptr);
 						fscanf( file_ptr, "%i", &violation );
-					} else {
+					}
+					else {
 						t_current = clock();
 						if (ifKit != NULL || ( (fakeobs_index < n_fakeobs) && (ElapsedTime( t_beginmotion, t_current ) > 1000*t_obs_intro[fakeobs_index]) ) ) {
 							for (int k = 0; k < n_tempsensors; k++) {
@@ -650,7 +728,7 @@ int main() {
 										break;
 									} else continue;
 								} else {
-									/* The Interface Kit is actually connected.  Measure the temperature reading from each sensor. */
+									/* The Interface Kit is actually connected.  Measure the temperature reading from each potentiometer "sensor". */
 									CPhidgetInterfaceKit_getSensorValue(ifKit, sensor_channels[k], &new_temp );
 									if ((new_temp > max_temp) && (temp[k] < max_temp)) {
 										violation		= 1;
@@ -668,19 +746,38 @@ int main() {
 				}
 
 				if (violation == 1) {
+
 					/* Stop moving and determine current configuration */
 					printf("\tTemperature constraints violated.  Halting motion and constructing temperature obstacle...\n");
-					for (int k = 0; k < n; k++) {
-						CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q_current[k]));
-						q_current[k] = Command2Deg(q_current[k]);
-						CPhidgetAdvancedServo_setPosition( servo, channels[k], Deg2Command(path[index][k]) );
-					}
-					do {
+					/*if (index > 0) {
 						for (int k = 0; k < n; k++) {
-							CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
-							q[k] = Command2Deg(q[k]);
+							CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q_current[k]));
+							q_current[k] = Command2Deg(q_current[k]);
+
+							CPhidgetAdvancedServo_setPosition( servo, channels[k], Deg2Command(path[index-1][k]) );
+
 						}
-					} while (DistSq(q, path[index], n, w) > epsilon_sq);
+						do {
+							for (int k = 0; k < n; k++) {
+								CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
+								q[k] = Command2Deg(q[k]);
+							}
+						} while (DistSq(q, path[index-1], n, w) > epsilon_sq);
+
+					} else {*/
+						for (int k = 0; k < n; k++) {
+							CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q_current[k]));
+							q_current[k] = Command2Deg(q_current[k]);
+
+							CPhidgetAdvancedServo_setPosition( servo, channels[k], Deg2Command(q_current[k]) );
+						}
+						do {
+							for (int k = 0; k < n; k++) {
+								CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
+								q[k] = Command2Deg(q[k]);
+							}
+						} while (DistSq(q, q_current, n, w) > epsilon_sq);
+					//}
 
 					/* Allow time to run estimation algorithm to find location of maximum temperature and its normal vector */
 					do {
@@ -701,6 +798,9 @@ int main() {
 					unsafe	= 1;
 					ConstructTempObstacle( sensor_link, pos_maxheat, r_tempobs, H_tempobs, offset_tempobs, n_hat_tempobs, beta_tempobs, DH, q_current, obs );
 
+					/* Plot the temperature obstacles */
+					PlotTempObstaclesInMATLAB( obs, matlab );
+
 					/* Check temperature obstacles, and keep lists of violating nodes in each tree (set their "safety" properties to 1 or 0, depending) */
 					TempObsViolation( &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, obs, G, DH );
 				}
@@ -712,9 +812,12 @@ int main() {
 					node_star_index[i], 'n', filename, i, &fpos, matlabRRT );
 
 				t_end = clock();
-				if ( (ElapsedTime( t_start, t_end ) >= max_t_horizon) || (unsafe == 1) ) {
+				if ((ElapsedTime( t_start, t_end ) >= max_t_horizon) || (unsafe == 1) ) {
 					/* If unsafe or the time has exceeded its allowable limit, stop moving and determine the current configuration */
-					printf("\tUnsafe and/or exceeded allowed horizon time.  Formulating new plan...\n");
+					if (unsafe == 1) {
+						printf("\tUnsafe due to temperature obstacle(s).  Formulating new plan...\n");
+					} else printf("\tExceeded allowed horizon time.  Formulating new plan...\n");
+
 					for (int k = 0; k < n; k++) {
 						CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
 						q[k] = Command2Deg(q[k]);
@@ -723,43 +826,77 @@ int main() {
 					/* Add q to the appropriate tree, as indicated by the transition index (pathlenA) at which pathA of "path" switches to pathB */
 					SplitPathAtNode( path, q, w, pathA, pathB, pathlenA, index, &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, NN_alg, matlabRRT );
 					
-					/* Find new candidate plans that avoid the use of unsafe nodes from q to q_waypoints[n*(i+1)] using trees[2*i] and trees[2*i+1]
-							(should return same path if nothing new was found due to addition of q to appropriate tree (0 length edge) -> same as MPC )
-							(num_replans <= max_replans -> some feasible paths may be neglected depending on size of max_replan_neighbors) */
-					num_replans = RePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), q, n, w, max_replans, max_replan_neighbors, eta_RRT, gamma_RRT, replan_indices, NN_alg );
-
-					/* Find a safe path among the candidate plans, listed in (locally!) optimal shortest-path order in "replan_indices" */
-					unsafe = FindSafePath( &(tree_ptrs[2*i]), replan_indices, num_replans, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
-
-					/* If still unsafe, stop moving (if not already stopped) and do an exhaustive search to find a possible solution.  Return the first one found. */
-					if (unsafe == 1) {
-						for (int k = 0; k < n; k++) {
-							CPhidgetAdvancedServo_setPosition(servo, channels[k], q[k]);
+					if ( ConstraintViolation( q, n, obs, G, DH, 2 ) == 1 ) {
+						printf("\tMeasured point is unsafe!!!\n");
+						cout << "\tJoint angles "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
+						if (index > 0) {
+							for (int k = 0; k < n; k++) {
+								q[k] = path[index-1][k];
+							}
+							cout << "Redefined q to "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
 						}
-						printf("\tNo cost-efficient plan found.  Conducting an exhaustive search for any feasible path...\n");
-						unsafe = ExhaustiveRePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), eta_RRT, gamma_RRT, NN_alg, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
 					}
+
+					int doubling = 0;
+					do {
+						/* Find new candidate plans that avoid the use of unsafe nodes from q to q_waypoints[n*(i+1)] using trees[2*i] and trees[2*i+1]
+								(should return same path if nothing new was found due to addition of q to appropriate tree (0 length edge) -> same as MPC )
+								(num_replans <= max_replans -> some feasible paths may be neglected depending on size of max_replan_neighbors) */
+						num_replans = RePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), q, n, w, max_replans, max_replan_neighbors, eta_RRT, gamma_RRT, replan_indices, NN_alg );
+
+						/* Find a safe path among the candidate plans, listed in (locally!) optimal shortest-path order in "replan_indices" */
+						unsafe = FindSafePath( &(tree_ptrs[2*i]), replan_indices, num_replans, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
+						
+						/* Double the number of nodes used in k-nearest replanning search.  If still unsafe, search again using more neighbors. */
+						doubling += 1;
+						max_replan_neighbors *= 2;
+
+					} while ((unsafe == 1) && (doubling <= max_replan_doubling));
+
+					max_replan_neighbors = max_replan_neighbors/( (int) pow(2.0, doubling) );
+
+					// TODO ExhaustiveRePlan seems to be in error.  Do not use for now!
+					///* If still unsafe, stop moving (if not already stopped) and do an exhaustive search to find a possible solution.  Return the first one found. */
+					//if (unsafe == 1) {
+					//	for (int k = 0; k < n; k++) {
+					//		CPhidgetAdvancedServo_setPosition(servo, channels[k], q[k]);
+					//	}
+					//	printf("\tNo cost-efficient plan found.  Conducting an exhaustive search for any feasible path...\n");
+					//	unsafe = ExhaustiveRePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), eta_RRT, gamma_RRT, NN_alg, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
+					//}
 
 					/* Continue to build new paths if still unsafe.  Otherwise set the manipulator to track the first point on the new path (fall-through on switch is intentional). */
 					switch (unsafe) {
 						case 1:
-							printf("\tNo safe path found.  Attempting to construct new paths...\n");
-							t_start = clock();	t_end = clock();
-							while ((unsafe == 1) && (ElapsedTime( t_start, t_end ) >= max_t_rebuild)) {
-								BuildRRTs( &(trees[2*i + (iter[i] % 2)]), &(trees[2*i + ((iter[i]+1) % 2)]), &(num_nodes[2*i + (iter[i] % 2)]), &(num_nodes[2*i + ((iter[i]+1) % 2)]), 
-									n, w, &(iter[i]), max_iter, soln, sampling, Q, q_max, q_min, NN_alg, max_neighbors, eta_RRT, gamma_RRT, epsilon, obs_indicator, obs, G, DH, 
-									node_star_index[i], 'n', filename, i, &fpos, matlabRRT );
-								
-								if (ElapsedTime( t_end, clock() ) >= max_t_horizon) {
-									SplitPathAtNode( path, q, w, pathA, pathB, pathlenA, index, &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, NN_alg, matlabRRT );
-									unsafe = ExhaustiveRePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), eta_RRT, gamma_RRT, NN_alg, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
-								}
-								t_end = clock();
-							}
-							if (unsafe == 1) {
-								printf("\tCould not find safe path.  Aborting motion plan...\n");
-								goto END_MOTION_PLAN;
-							}
+							
+							printf("\tCould not find safe path. Aborting motion plan...\n");
+							// execute emergency plan
+							EmergencyPlan( q, q_emergency, q_waypoints, n, n_emergency, w, epsilon_sq, servo, channels, i);
+							emergency_plan_bool = 1;
+							index = pathlenA + pathlenB - 1;
+							max_t_horizon = DBL_MAX;
+							unsafe = 0;
+							break;
+							//goto END_MOTION_PLAN;
+							
+							//printf("\tNo safe path found.  Attempting to construct new paths...\n");
+							//t_start = clock();	t_end = clock();
+							//while ((unsafe == 1) && (ElapsedTime( t_start, t_end ) <= max_t_rebuild)) {
+							//	BuildRRTs( &(trees[2*i + (iter[i] % 2)]), &(trees[2*i + ((iter[i]+1) % 2)]), &(num_nodes[2*i + (iter[i] % 2)]), &(num_nodes[2*i + ((iter[i]+1) % 2)]), 
+							//		n, w, &(iter[i]), max_iter, soln, sampling, Q, q_max, q_min, NN_alg, max_neighbors, eta_RRT, gamma_RRT, epsilon, obs_indicator, obs, G, DH, 
+							//		node_star_index[i], 'n', filename, i, &fpos, matlabRRT );
+							//	
+							//	if (ElapsedTime( t_end, clock() ) >= max_t_horizon) {
+							//		printf("performing exhaustive replan\n");
+							//		unsafe = ExhaustiveRePlan( &(tree_ptrs[2*i]), &(num_nodes[2*i]), eta_RRT, gamma_RRT, NN_alg, &pathlenA, &pathlenB, &pathA, &pathB, &path, q, epsilon, n, w, obs, G, DH, filename);
+							//		printf("result of exhaustive replan: %s\n", unsafe?"unsafe":"safe");
+							//	}
+							//	t_end = clock();
+							//}
+							//if (unsafe == 1) {
+							//	printf("\tCould not find safe path.  Aborting motion plan...\n");
+							//	goto END_MOTION_PLAN;	//TODO: get rid of GOTO!!! what happens to plans when this GOTO is called?
+							//}
 					
 						case 0:
 							PlotPathInMATLAB( i, index, pathlenA + pathlenB, n, path, matlab );
@@ -775,8 +912,8 @@ int main() {
 					CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
 					q[k] = Command2Deg(q[k]);
 				}
-			} while ( DistSq(q, path[index], n, w) > epsilon_sq );
-			
+			} while ( (emergency_plan_bool != 1) && ( DistSq(q, path[index], n, w) > epsilon_sq ) );
+			emergency_plan_bool = 0;
 			/* Increment index to execute move to next node in the path */
 			index = index + 1;
 		} while ( index < (pathlenA + pathlenB) );
@@ -793,6 +930,7 @@ int main() {
 		memcpy( q, path[index-1], n*sizeof(double) );
 		for (int k = pathlenA + pathlenB - 1; k >= 0; k--) free(path[k]);
 		free(path); free(pathA); free(pathB);
+		printf("free path and go to next one\n"); 
 	}
 
 	/*+============================================================+*/
@@ -820,9 +958,11 @@ int main() {
 		
 		/* Reset simulation for a new run.  Return everything to their original state before motion plan execution except for the
 		trees (which have grown to include more nodes). */
-		ResetSimulation( trees, n_trees, n_plans, num_nodes, feasible, node_star_index, obs, matlab );
+		ResetSimulation( reset_trees, trees, n_trees, n_plans, num_nodes, num_nodes_precomputed, feasible, node_star_index, obs, matlab );
 
 		goto BEGIN_MOTION_CONTROL;
+		//goto GENERATE_RRTs;	// TODO: this is just a dirty hack, should not be done by rebuilding RRTs.
+							//       Data structs are not released or reset, it only helps to get feasible paths at every run.
 	}	
 
 	// Disengage the actuators and shutdown
@@ -852,18 +992,37 @@ int main() {
 
 	/* Free memory from heaps */
 	printf("Freeing memory...\n");
-	for (int i = n-1; i >= 0; i--) {
-		for (int j = 2; j >= 0; j--) free(G->Body_coords[i][j]);
+	for (int i = 0; i <= n+1; i++)
+	{
+		for (int j = 0; j < 3; j++)
+		{
+			free(G->Body_coords[i][j]);
+		}
+		free(G->Body_coords[i]);
 	}
-	free(G->Body_coords); free(G->N_coords); free(G); free(DH); 
+	free(G->Body_coords);
+	free(G->N_coords);
+	free(G);
+	free(DH); 
 
-	free(obs->planes->a); free(obs->planes->b); free(obs->planes->c); free(obs->planes->d);	
+	free(obs->planes->a);
+	free(obs->planes->b);
+	free(obs->planes->c);
+	free(obs->planes->d);	
 	for (int i = obs->n_cylinders-1; i >= 0; i--) {
-		for (int j = 3; j >= 0; j--) free(obs->cylinders->Tinv[i][j]);
+		for (int j = 3; j >= 0; j--)
+		{
+			free(obs->cylinders->Tinv[i][j]);
+		}
 		free(obs->cylinders->Tinv[i]);
 	}
-	free(obs->cylinders->r); free(obs->cylinders->H); free(obs->cylinders->Tinv);
-	free(obs->cuboids->a); free(obs->cuboids->b); free(obs->cuboids->c); free(obs->cuboids->d);
+	free(obs->cylinders->r);
+	free(obs->cylinders->H);
+	free(obs->cylinders->Tinv);
+	free(obs->cuboids->a);
+	free(obs->cuboids->b);
+	free(obs->cuboids->c);
+	free(obs->cuboids->d);
 	if (obs->n_temp_zones >= 1) {
 		for (int i = obs->n_temp_zones - 1; i >= 0; i--) {
 			for (int j = 3; j >= 0; j--) free(obs->temp_zones->Tinv[i][j]);
@@ -889,7 +1048,7 @@ int main() {
 		kd_free(trees[j].kd_tree);
 	}
 	free(trees);
-	free(feasible); free(num_nodes); free(q_test);
+	free(feasible); free(num_nodes); free(num_nodes_precomputed); free(q_test);
 	
 	if ( file_ptr != NULL ) {
 		fclose( file_ptr );

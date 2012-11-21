@@ -51,6 +51,9 @@ returned by `WorldCoords`, adding a visualization of the arm OBB's and point rep
 	\param[in]	opacity		Face opacity. Enter 0 for transparent or 1 for full. */
 void PlotRobotConfigInMATLAB( struct coords* C, int n_points, double opacity, Engine* matlab );
 
+/*! Plot the temperature obstacles to figure handle TRAJfig. */
+void PlotTempObstaclesInMATLAB( struct obstacles* obs, Engine* matlab );
+
 /*! Plots the end effector trajectory corresponding to a given path in figure handle TRAJfig.  Generates the points traced out by the end-effector position along a given 
 joint-angle path using `Steer`, adding a curve of the traced-path plus the planned and former planned paths to TRAJfig.  Also overlays a plot of planar obstacles (updated 
 with each plot in order to properly span the axis dimensions), the current temperature obstacles, and removes the grasped object (last cuboidal obstacle) if "plan_index"

@@ -92,15 +92,12 @@ void InvHomTransformMatrix( double a, double d, double q, double alpha, double**
 	T[3][3] = 1.0;
 }
 
-void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, int n ) {
-	
+void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, double grip_sep, int n ) {
+
 	/* Use the Halton sampling sequence to optimally cover the OBB faces with the given number of face points */
 	int maxval = -1;
-	for (int i = 0; i < 3*n; i++) {
-		if (n_facepts[i] > maxval) {
-			maxval = n_facepts[i];
-		}
-	}
+	for (int i = 0; i < 3*n; i++) { if (n_facepts[i] > maxval) { maxval = n_facepts[i]; } }
+
 	int* sequence = (int*) malloc( maxval*sizeof(int) );	// Will not cause an error if maxval is 0 (only if we attempt to access it)
 	for (int i = 0; i < maxval; i++) {
 		sequence[i] = i;
@@ -108,16 +105,19 @@ void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, int n
 	double** U = Make2DDoubleArray(maxval, 2);
 	Halton( sequence, maxval, 2, U );
 	
-	/* Determine the total number of points for all OBB faces of each link i */
-	int* N_facepts = (int*) malloc( n*sizeof(int) );
-	for (int i = 0; i < n; i++) {
+	/* Determine the total number of points for all OBB faces of each link i and the end-effector tips */
+	int* N_facepts = (int*) malloc( (n+2)*sizeof(int) );
+	for (int i = 0; i <= n+1; i++) {
 		N_facepts[i] = 2*(n_facepts[3*i] + n_facepts[3*i+1] + n_facepts[3*i+2]);
 	}
 
-	/* Loop over all links of the manipulator */
-	double** T;
-	double rho[3], L, W, H, dx[8], dy[8], dz[8];
-	for (int i = 0; i < n; i++) {
+	/* Loop over all links of the manipulator, plus the two 
+	end effector tips */
+
+	double **T, rho[3], L, W, H, dx[8], dy[8], dz[8];
+	
+	// TODO: check if this should really be i <= (n+1)
+	for (int i = 0; i <= n+1; i++) {
 		rho[0]	= G->rho_x[i];
 		rho[1]	= G->rho_y[i];
 		rho[2]	= G->rho_z[i];
@@ -125,8 +125,14 @@ void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, int n
 		W		= G->W[i];
 		H		= G->H[i];
 
-		/* Initialize an OBB coordinate array for link i (the last term allocates an additional unit on the last iteration for the end effector) */
-		T		= Make2DDoubleArray(3, 8 + N_facepts[i] + (i/(n-1)) );
+		/* Apply end-effector gripper separation to end-effector tip OBB's */
+		if (i == n) {			rho[2] += grip_sep/2.0;		/* Right end-effector tip */
+		} else if (i == n+1) {	rho[2] -= grip_sep/2.0;		/* Left end-effector tip */
+		}
+
+		/* Initialize an OBB coordinate array for each link/end-effector-tip i (the last term 
+		allocates an additional unit on the last iteration for the end effector position -- see below) */
+		T		= Make2DDoubleArray(3, 8 + N_facepts[i] + (i/(n+1)) );
 
 		/* Add the body-fixed OBB corner points of link i to T */
 		dx[0] = 0; dx[1] = 0; dx[2] = 0; dx[3] = 0; dx[4] = L; dx[5] = L; dx[6] = L; dx[7] = L;
@@ -169,14 +175,17 @@ void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, int n
 
 		/* Save the points and total number of coordinates to geometry structure G for each link i */
 		G->Body_coords[i]	= T;
+		// TODO: T is allocated every time and then body_coords are set to this data
+		// memory for G->Body_coords is still allocated but not used anymore
 		G->N_coords[i]		= 8 + N_facepts[i];
 
-		/* If on the last link n, add the end effector point as the final body-fixed coordinate */
-		if (i == (n-1)) {
+		/* If on the last iteration, add the end effector point as the final body-fixed coordinate 
+		(used for visualization only, not collision detection; added here for ease of implementation with PlotEndEffectorPathInMATLAB) */
+		if (i == (n+1)) {
 			G->Body_coords[i][0][ G->N_coords[i] ] = grip_pos[0];
 			G->Body_coords[i][1][ G->N_coords[i] ] = grip_pos[1];
 			G->Body_coords[i][2][ G->N_coords[i] ] = grip_pos[2];
-			G->N_coords[i]	+= 1;
+			G->N_coords[i] += 1;
 		}
 	}
 
@@ -198,10 +207,12 @@ void WorldCoords( struct geom *G, struct DHparams *DH, double* q, int n, struct 
 
 	IdentityMatrix(Timinus1,4);
 
-	for (int i = 0; i < n; i++) {
-		/* Find the transformation matrix from the link i to the world frame */
-		HomTransformMatrix( DH->a[i], DH->d[i], q[i], DH->alpha[i], Ti );
-		MatrixMultiply( Timinus1, Ti, 4, 4, 4, T );
+	for (int i = 0; i < n+2; i++) {
+		/* Find the transformation matrix from the link i to the world frame.  If i >= n, i corresponds to an end-effector tip (do not update T). */
+		if (i < n) {
+			HomTransformMatrix( DH->a[i], DH->d[i], q[i], DH->alpha[i], Ti );
+			MatrixMultiply( Timinus1, Ti, 4, 4, 4, T );
+		}
 		
 		/* Transform the body-fixed OBB coords of link i to the world frame and save them to C */
 		for (int j = 0; j < G->N_coords[i]; j++) {
@@ -217,10 +228,12 @@ void WorldCoords( struct geom *G, struct DHparams *DH, double* q, int n, struct 
 		}
 		sum = sum + G->N_coords[i];
 
-		/* Update T_(i-1) */
-		for (int j = 0; j < 4; j++) {
-			for (int k = 0; k < 4; k++) {
-				Timinus1[j][k] = T[j][k];
+		/* Update T_(i-1) if the next index corresponds to a link.  Otherwise, stop updating (end-effector tips use the matrix T of link n). */
+		if (i+1 < n) {
+			for (int j = 0; j < 4; j++) {
+				for (int k = 0; k < 4; k++) {
+					Timinus1[j][k] = T[j][k];
+				}
 			}
 		}
 	}

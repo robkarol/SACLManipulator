@@ -3,6 +3,10 @@
 
 #include "engine.h"
 #include "linked_list.h"
+#include "phidget_interface.h"
+
+#define FORWARD 1
+#define REVERSE -1
 
 /*! Generates the specified values of the D-dimensional Halton sequence.  Computes the members of the Halton sequence corresponding to the elements of *sequence*,
 returning a *length* \f$\times D\f$ array of `doubles` to array *h*.  Each row *m* corresponds to the \f$m^{th}\f$ element of *sequence*, while each column *n*
@@ -198,9 +202,11 @@ int ExhaustiveRePlan(struct tree **T_ptrs, int* n_nodes, double eta_RRT, double 
 /*! Reset the simulation for a new run.  Resets node saftey properties to 1, removes any temperature obstacles from previous run,
 re-defines the new "best" plan by finding the new shortest paths that result from any node and edge additions made during the previous simulation,
 and closes old plots so that they may be regenerated during the next simulation. */
-void ResetSimulation( struct tree* trees, int n_trees, int n_plans, int* num_nodes, int* feasible, int** node_star_index, struct obstacles* obs, Engine* matlab );
+void ResetSimulation( char reset_trees, struct tree* trees, int n_trees, int n_plans, int* num_nodes, int* num_nodes_precomputed,
+	int* feasible, int** node_star_index, struct obstacles* obs, Engine* matlab );
 
-		/*! Generate array of samples, *Q*.  Computes the sample array used during construction of pre-computed RRT's (prior to motion plan execution).  Used so that
+
+/*! Generate array of samples, *Q*.  Computes the sample array used during construction of pre-computed RRT's (prior to motion plan execution).  Used so that
 samples can be sent in batch rather than generated individually up to *max_iter* times during the call to `BuildRRTs`.  Generates <*filename*>samples.dat \see Sample, Halton
 	\param[in,out]	Q			Pre-allocated `double` array of size \f$(\f$*max_iter*\f$ \times n)\f$, used to store samples
 	\param[in]	sampling		User specification of sampling method ("pseudorandom" or "halton")
@@ -209,5 +215,8 @@ samples can be sent in batch rather than generated individually up to *max_iter*
 void GenerateSamples(double** Q, char* sampling, int n, int max_iter, double* q_max, double* q_min, char* filename);
 	
 
+/*! Execute emergency motion plan. Searches nearest point of the motion plan and execute all folllowing nodes. */ 
+void EmergencyPlan( double* q, double* q_emergency, double* q_waypoints, int n, int n_emergency, double* w, double epsilon_sq, 
+	CPhidgetAdvancedServoHandle servo, int* channels, int plan_num );
 
 #endif

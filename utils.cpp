@@ -300,8 +300,8 @@ int* Dec2BaseInts(int num, int base, int *ptr_N) {
 
 
 void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, int* max_neighbors, double* epsilon, int* n, int* n_waypoints, double* q_waypoints, 
-	double* q_min, double* q_max, int* grip_actions, double* grip_angles, int* n_facepts, double* L, double* W, double* H, double* rho_x, double* rho_y, 
-	double* rho_z, double* d, double* a, double* alpha, int* n_planes, double* nhat_planes, double* xyz_planes, int* n_cylinders, double* YPR_cylinders, 
+	double* q_min, double* q_max, int* grip_actions, double* grip_angles, double* grip_sep, double* grip_pos, int* n_facepts, double* L, double* W, double* H, 
+	double* rho_x, double* rho_y, double* rho_z, double* d, double* a, double* alpha, int* n_planes, double* nhat_planes, double* xyz_planes, int* n_cylinders, double* YPR_cylinders, 
 	double* xyz_cylinders, double* r_cylinders, double* H_cylinders, int* n_cuboids, double* YPR_cuboids, double* LWH_cuboids, double* xyz_cuboids, char load_input ) {
 	
 	/* Output input data if "load_input" = 'n', otherwise load input values from previous run */
@@ -312,52 +312,74 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 		printf("Printing input and obstacle data to file...\n");
 		infilefid = fopen( strcat(filename, "input.dat"), "w+" );
 		time(&rawtime);
-		fprintf(infilefid, "%s\n%s\t%s%s\t%s\n%s\t%s\n", "Manipulator RRT Input Data", "Last updated:    ", ctime(&rawtime), "Solution type:   ", soln, "Sampling method: ", sampling);
-		fprintf(infilefid, "%s\t%i\n%s\t%i\n%s\t%5.5Lf\n%s\t%i\n%s\t%i\n", "Max. iterations: ", *max_iter, "Max. neighbors:  ", *max_neighbors, "epsilon [deg]:   ", *epsilon, "n:               ", *n, "n_waypoints:     ", *n_waypoints);
-		fprintf(infilefid, "%s\t%i\t%i\n%s\t%5.5Lf\t%5.5Lf\t%5.5Lf\n\n", "grip_actions:    ", grip_actions[0], grip_actions[1], "grip_angles [deg]: ", grip_angles[0], grip_angles[1], grip_angles[2]);
-		for (int i = 0; i < *n_waypoints; i++) {
-			fprintf(infilefid, "%s%d%s\t", "q_WP", i, " ");
-		}
-		fprintf(infilefid, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
-			"q_min ", "q_max ", "L", "W", "H", "rho_x ", "rho_y ", "rho_z ", "d", "a", "alpha", "n_ptsXY", "n_ptsYZ", "n_ptsXZ");
+		fprintf(infilefid, "%s\n%s\t%s%s\t%s\n%s\t%s\n",								"Manipulator RRT Input Data", "Last updated:    ", ctime(&rawtime), "Solution type:   ", soln, "Sampling method: ", sampling);
+		fprintf(infilefid, "%s\t%i\n%s\t%i\n%s\t%5.5Lf\n%s\t%i\n%s\t%i\n",				"Max. iterations: ", *max_iter, "Max. neighbors:  ", *max_neighbors, "epsilon [deg]:   ", *epsilon, "n:               ", *n, "n_waypoints:     ", *n_waypoints);
+		fprintf(infilefid, "%s\t%i\t%i\n%s\t%5.5Lf\t%5.5Lf\t%5.5Lf\n",					"grip_actions:    ", grip_actions[0], grip_actions[1], "grip_angles [deg]: ", grip_angles[0], grip_angles[1], grip_angles[2]);
+		fprintf(infilefid, "%s\t%5.5Lf\t%5.5Lf\t%5.5Lf\n%s\t%5.5Lf\t%5.5Lf\t%5.5Lf\n",	"grip_sep:        ", grip_sep[0], grip_sep[1], grip_sep[2], "grip_pos:          ", grip_pos[0], grip_pos[1], grip_pos[2]);
+
+		fprintf(infilefid, "\nJoint Angle Bounds and Waypoints\n");
+		fprintf(infilefid, "%s\t%s\t%s\t", "Link ", "q_min ", "q_max ");
+		for (int i = 0; i < *n_waypoints; i++) fprintf(infilefid, "%s%d%s\t", "q_WP", i, " ");
+		fprintf(infilefid, "\n");
 		for (int i = 0; i < *n; i++) {
-			for (int j = 0; j < *n_waypoints; j++) {
-				fprintf(infilefid, "%5.5Lf\t", q_waypoints[(*n)*j + i]);
-			}
-			fprintf(infilefid, "%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%i\t%i\t%i\n",
-				q_min[i], q_max[i], L[i], W[i], H[i], rho_x[i], rho_y[i], rho_z[i], 
+			fprintf(infilefid, "%i\t%5.5Lf\t%5.5Lf\t", i+1, q_min[i], q_max[i]);
+			for (int j = 0; j < *n_waypoints; j++) fprintf(infilefid, "%5.5Lf\t", q_waypoints[(*n)*j + i]);
+			fprintf(infilefid, "\n");
+		}
+
+		fprintf(infilefid, "\nLink Geometry\n");
+		fprintf(infilefid, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+			"Link ", "L", "W", "H", "rho_x ", "rho_y ", "rho_z ", "d", "a", "alpha", "n_ptsXY", "n_ptsYZ", "n_ptsXZ");
+		for (int i = 0; i < *n; i++) {
+			fprintf(infilefid, "%i\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%i\t%i\t%i\n",
+				i+1, L[i], W[i], H[i], rho_x[i], rho_y[i], rho_z[i], 
 				d[i], a[i], alpha[i], n_facepts[3*i], n_facepts[3*i+1], n_facepts[3*i+2]);
+		}
+
+		fprintf(infilefid, "\nEnd-effector Geometry\n");
+		fprintf(infilefid, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", "Tip ", "L", "W", "H", "rho_x ", "rho_y ", "rho_z ", "n_ptsXY", "n_ptsYZ", "n_ptsXZ");
+		char* tags[2] = {"RIGHT", "LEFT "};
+		for (int i = *n; i < *n+2; i++) {
+			fprintf(infilefid, "%s\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%5.5Lf\t%i\t%i\t%i\n", 
+				tags[i-*n], L[i], W[i], H[i], rho_x[i], rho_y[i], rho_z[i], n_facepts[3*i], n_facepts[3*i+1], n_facepts[3*i+2]);
 		}
 	}
 	else if (strncmp(&load_input, "y", 1) == 0) {
 		printf("Loading input parameters and settings from file...\n");
 		infilefid = fopen( strcat(filename, "input.dat"), "r" );
 
-		//TODO : CHECK if infilfid == NULL
-
-		if(infilefid != NULL)
-		{
+		if (infilefid != NULL) {
 			fscanf(infilefid, "%*[^\n]\n%*[^\n]\n%*[^\t]\t%s\n%*[^\t]\t%s\n", soln, sampling );
 			fscanf(infilefid, "%*[^\t]\t%i\n%*[^\t]\t%i\n%*[^\t]\t%Lf\n%*[^\t]\t%i\n%*[^\t]\t%i\n", max_iter, max_neighbors, epsilon, n, n_waypoints );
 			fscanf(infilefid, "%*[^\t]\t%i\t%i\n%*[^\t]\t%Lf\t%Lf\t%Lf\n", &(grip_actions[0]), &(grip_actions[1]), &(grip_angles[0]), &(grip_angles[1]), &(grip_angles[2]) );
-			fscanf(infilefid, "\n%*[^\n]\n");
+			fscanf(infilefid, "%*[^\t]\t%Lf\t%Lf\t%Lf\n%*[^\t]\t%Lf\t%Lf\t%Lf\n", &(grip_sep[0]), &(grip_sep[1]), &(grip_sep[2]), &(grip_pos[0]), &(grip_pos[1]), &(grip_pos[2]) );
+			
+			fscanf(infilefid, "\n%*[^\n]\n%*[^\n]\n");
 			for (int i = 0; i < *n; i++) {
-				for (int j = 0; j < *n_waypoints; j++) {
-					fscanf(infilefid, "%Lf\t", &(q_waypoints[(*n)*j + i]) );
-				}
-				fscanf(infilefid, "%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%i\t%i\t%i\n",
-					&(q_min[i]), &(q_max[i]), &(L[i]), &(W[i]), &(H[i]), &(rho_x[i]), &(rho_y[i]), &(rho_z[i]), 
+				fscanf(infilefid, "%*i\t%Lf\t%Lf\t", &(q_min[i]), &(q_max[i]));
+				for (int j = 0; j < *n_waypoints; j++) fscanf(infilefid, "%Lf\t", &(q_waypoints[(*n)*j + i]) );
+				fscanf(infilefid, "\n");
+			}
+
+			fscanf(infilefid, "\n%*[^\n]\n%*[^\n]\n");
+			for (int i = 0; i < *n; i++) {
+				fscanf(infilefid, "%*i\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%i\t%i\t%i\n",
+					&(L[i]), &(W[i]), &(H[i]), &(rho_x[i]), &(rho_y[i]), &(rho_z[i]), 
 					&(d[i]), &(a[i]), &(alpha[i]), &(n_facepts[3*i]), &(n_facepts[3*i+1]), &(n_facepts[3*i+2]));
 			}
-		}
 
-		else
-		{
+			fscanf(infilefid, "\n%*[^\n]\n%*[^\n]\n");
+			for (int i = *n; i < *n+2; i++) {
+				fscanf(infilefid, "%*s\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%Lf\t%i\t%i\t%i\n",
+					&(L[i]), &(W[i]), &(H[i]), &(rho_x[i]), &(rho_y[i]), &(rho_z[i]), &(n_facepts[3*i]), &(n_facepts[3*i+1]), &(n_facepts[3*i+2]));
+			}
+		}
+		else {
 			printf("ERROR: could not open input file.\n");
 		}
 	}
-	if(infilefid != NULL)
-	{
+
+	if (infilefid != NULL) {
 		fclose(infilefid);
 	}
 	filename[strlen(filename)-9] = NULL;
@@ -369,8 +391,7 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 
 	if (strncmp(&load_input, "n", 1) == 0) {
 		obsfilefid = fopen( strcat(filename, "obstacles.dat"), "w+");
-		if(obsfilefid != NULL)
-		{
+		if (obsfilefid != NULL) {
 			fprintf(obsfilefid, "%s\n", "Manipulator RRT Obstacle Data");
 			fprintf(obsfilefid, "%s\t%s\n", "nhat_planes", "xyz_planes");
 			for (int i = 0; i < 3*(*n_planes); i++) {
@@ -390,17 +411,14 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 				fprintf(obsfilefid, "%5.4Lf\t%5.4Lf\t%5.4Lf\n", YPR_cuboids[i], LWH_cuboids[i], xyz_cuboids[i]);
 			}
 		}
-
-		else
-		{
+		else {
 			printf("ERROR: could not open obstacle file.\n");
 		}
 	}
 	else if (strncmp(&load_input, "y", 1) == 0) {
 		obsfilefid = fopen( strcat(filename, "obstacles.dat"), "r");
 
-		if(obsfilefid != NULL)
-		{
+		if (obsfilefid != NULL) {
 			fscanf(obsfilefid, "%*[^\n]\n%*[^\n]\n");
 			while (return_val != 0) {
 				return_val = fscanf(obsfilefid, "%Lf\t%Lf\n", &(nhat_planes[index]), &(xyz_planes[index]) );
@@ -423,13 +441,12 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 			}
 			*n_cuboids = (index-1)/3;		index = 0;			return_val = 1;
 		}
-		else
-		{
+		else {
 			printf("ERROR: could not open obstacle file.\n");
 		}
 	}
-	if(obsfilefid != NULL)
-	{
+	
+	if (obsfilefid != NULL) {
 		fclose(obsfilefid);
 	}
 	filename[strlen(filename)-13] = NULL;

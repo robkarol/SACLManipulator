@@ -4,11 +4,14 @@
 #include "obstacles.h"
 #include "tree_data_structure.h"
 #include "linked_list.h"
+#include <iostream>
+
+using namespace std;
 
 int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH, int obs_indicator ) {
 	
 	/* Create variables for OBB coordinate storage (8 points per OBB, for a total of "n" links) */
-	int n_points = SumInts(G->N_coords, n);
+	int n_points = SumInts(G->N_coords, n+2);
 	struct coords C;
 	C.x = (double*) malloc(n_points*sizeof(double));
 	C.y = (double*) malloc(n_points*sizeof(double));
@@ -17,9 +20,12 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 	/* Find the world coordinates of the robot Oriented Bounding Boxes */
 	WorldCoords( G, DH, q_new, n, &C );
 
+	/* Decrement n_points so that the last point (representative point of end effector position, "grip_pos") is not included in collision detection */
+	n_points -= 1;
+
 	//FILE *datafile = fopen( "C:/Users/Joe/Desktop/testcoords.dat", "w+");
 	//fprintf(datafile, "%s\t%s\t%s\n", "x", "y", "z");
-	//for (int k = 0; k < SumInts(G->N_coords, n); k++) {
+	//for (int k = 0; k < n_points; k++) {
 	//	fprintf(datafile, "%5.3Lf\t%5.3Lf\t%5.3Lf\n", C.x[k], C.y[k], C.z[k]);
 	//}
 	//fclose(datafile);
@@ -66,6 +72,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 				f = pow( v_new[0][0], 2.0 ) + pow( v_new[1][0], 2.0 ) - pow( obs->cylinders->r[i], 2.0 );
 				if ( (f < 0) && (v_new[2][0] < (obs->cylinders->H[i]/2.0)) && (v_new[2][0] > -(obs->cylinders->H[i]/2.0))) {
 					boolean = 1;
+					cout << "Collision with cylinder " << i << endl;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -117,12 +124,15 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 void TempObsViolation(struct tree** T, int* num_nodes, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH ){
 	
 	/* Create variables for OBB coordinate storage (8 points per OBB, for a total of "n" links) */
-	int n_points = SumInts(G->N_coords, n);
+	int n_points = SumInts(G->N_coords, n+2);
 	struct coords C;
 	C.x = (double*) malloc(n_points*sizeof(double));
 	C.y = (double*) malloc(n_points*sizeof(double));
 	C.z = (double*) malloc(n_points*sizeof(double));
 	
+	/* Decrement n_points so that the last point (representative point of end effector position, "grip_pos") is not included in collision detection */
+	n_points -= 1;
+
 	int i, j, k, t, a;
 	double f;
 	double** v = Make2DDoubleArray(4,1);
@@ -177,6 +187,9 @@ void TempObsViolation(struct tree** T, int* num_nodes, int n, struct obstacles* 
 		if (tree_type[t] == -1) {
 			/* If a reverse-tree, ensure that the root (goal state) is not unsafe or else abort */
 		//	assert( T[t]->safety[0] == 1 );
+			if (T[t]->safety[0] == 1) {
+				cout << "Goal node is unsafe!!!" << endl;
+			}
 			T[t]->safety[0] = 1;
 		}
 	}

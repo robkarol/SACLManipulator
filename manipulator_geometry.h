@@ -12,14 +12,14 @@ struct coords {
 /*! Structure for manipulator geometry.  Structure variable encapsulating manipulator geometry information, including link dimensions, Oriented-Bounding Box
 (OBB) positioning, and body-fixed OBB coordinates. */
 struct geom {
-	double* L;						/*!< Array of link lengths */
-	double* W;						/*!< Array of link widths */
-	double* H;						/*!< Array of link heights */
-	double* rho_x;					/*!< x-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective Oriented Bounding Boxes (OBB's) */
-	double* rho_y;					/*!< y-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective Oriented Bounding Boxes (OBB's) */
-	double* rho_z;					/*!< z-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective Oriented Bounding Boxes (OBB's) */
-	int* N_coords;					/*!< Array of the numbers of coordinates used to represent each link (at least 8, one for each OBB corner, plus any face points) */
-	double*** Body_coords;			/*!< An array of the x-y-z body-fixed OBB coordinate arrays, one for each link */
+	double* L;						/*!< Array of link lengths, followed by the right and left end-effector tip lengths */
+	double* W;						/*!< Array of link widths, followed by the right and left end-effector tip widths */
+	double* H;						/*!< Array of link heights, followed by the right and left end-effector tip heights */
+	double* rho_x;					/*!< x-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective and end-effector tip Oriented Bounding Boxes (OBB's) */
+	double* rho_y;					/*!< y-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective and end-effector tip Oriented Bounding Boxes (OBB's) */
+	double* rho_z;					/*!< z-coordinates in each link's body-fixed frame to the back bottom-left corner of their respective and end-effector tip Oriented Bounding Boxes (OBB's) */
+	int* N_coords;					/*!< Array of the numbers of coordinates used to represent each link and end-effector tip (at least 8, one for each OBB corner, plus any face points) */
+	double*** Body_coords;			/*!< An array of the x-y-z body-fixed OBB coordinate arrays, one for each link and end-effector tip */
 };
 
 /*! Structure of Denavit-Hartenberg parameters.  Structure variable containing the Denavit-Hartenberg (DH) parameters of the manipulator arm.  DH parameters are a particular 
@@ -67,8 +67,9 @@ void InvHomTransformMatrix( double a, double d, double q, double alpha, double**
 for each box, the facepoints specified by *n_facepts*, and the end effector point given by *grip_pos* \see ::geom, WorldCoords, main
 	\param[in]	n_facepts	Vector containing the numbers of points to use for each pair of OBB faces, given in groups of 3 for each link (faces 
 							parallel to xy-, yz-, and xz-planes, respectively). Computed using the Halton sequence, scaled to the link face dimensions.
-	\param[in]	grip_pos	\f$1\times3\f$ vector in the body-fixed frame of link *n* of the representative end-effector position */
-void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, int n );
+	\param[in]	grip_pos	\f$1\times3\f$ vector in the body-fixed frame of link *n* of the representative end-effector position
+	\param[in]	grip_sep	Distance between end-effector tips (updated between plans when gripper is adjusted; assumes separation occurs along the body-fixed z-axis of link *n* */
+void BodyFixedOBBcoords( struct geom *G, int* n_facepts, double* grip_pos, double grip_sep, int n );
 
 /*! Output the coordinates, *C*, w.r.t.\ the world frame of the corners and face points of each link's OBB \see ::geom, ::DHparams, ::coords, BodyFixedOBBcoords, main
 	\param[in]	q			Manipulator joint-angle configuration

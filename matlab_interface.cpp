@@ -449,8 +449,8 @@ void PlotRobotConfigInMATLAB( struct coords* C, int n_points, double opacity, En
 			"z", Double,1, 1,1,n_points, C->z,		"fade", Double,0, 1,1,1, opacity	)  == EXIT_SUCCESS );
 		engEvalString( matlab, "figure(TRAJfig);	Cdata = plot3( x, y, z, coord_format, 'Color', (1-fade)*coord_color );							\
 			traj_index = size(linkdata,2)+1;																										\
-			for j = 1:n;																															\
-			f1_indices = sum(N_coords(1:(j-1)))+[1,2,4,3];			f4_indices = sum(N_coords(1:(j-1)))+[3,4,6,5];									\
+			for j = 1:(n+2);																														\
+				f1_indices = sum(N_coords(1:(j-1)))+[1,2,4,3];		f4_indices = sum(N_coords(1:(j-1)))+[3,4,6,5];									\
 				f2_indices = sum(N_coords(1:(j-1)))+[7,8,6,5];		f5_indices = sum(N_coords(1:(j-1)))+[1,3,5,7];									\
 				f3_indices = sum(N_coords(1:(j-1)))+[1,2,8,7];		f6_indices = sum(N_coords(1:(j-1)))+[2,4,6,8];									\
 				linkdata(6*j-5,traj_index)	= patch( x(f1_indices), y(f1_indices), z(f1_indices), link_color, 'FaceAlpha', fade*link_alpha );		\
@@ -463,6 +463,28 @@ void PlotRobotConfigInMATLAB( struct coords* C, int n_points, double opacity, En
 	}
 }
 
+void PlotTempObstaclesInMATLAB( struct obstacles* obs, Engine* matlab ) {
+
+	if ( matlab != NULL ) {
+		if ( obs->n_temp_zones > 0 ) {
+			engEvalString( matlab, "if(exist('tempzone_handles','var') & ishandle(tempzone_handles) );	delete(tempzone_handles);	end;" );
+			assert( SendArraysToMATLAB( __LINE__, matlab, 5,	"n_temp_zones", Int,0, 1,1,1, obs->n_temp_zones,
+				"beta", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->beta,		"h1", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->h1,
+				"h2", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->h2,			"Tinv", Double,3, obs->n_temp_zones,4,4, obs->temp_zones->Tinv	)  == EXIT_SUCCESS );
+			engEvalString( matlab, "tempzone_handles = zeros(3*n_temp_zones,1); figure(TRAJfig);														\
+				for j = 1:n_temp_zones;																												\
+					[x,y,z] = cylinder( [h1(j)*tand(beta(j)), h2(j)*tand(beta(j))], 30 );					z = (h2(j)-h1(j)).*z + h1(j);			\
+					T(1:3,1:3,j) = Tinv(1:3,1:3,j)';		T(1:3,4,j) = -T(1:3,1:3,j)*Tinv(1:3,4,j);	T(4,:,j) = Tinv(4,:,j);						\
+					x = x(:)'; y = y(:)'; z = z(:)';		M = T(:,:,j)*[x; y; z; ones(1,length(x))];												\
+					x = reshape(M(1,:),2,numel(x)/2);		y = reshape(M(2,:),2,numel(y)/2);				z = reshape(M(3,:),2,numel(z)/2);		\
+					tempzone_handles(3*j-2) = surf(x,y,z,ones(size(z)), 'FaceAlpha', obs_alpha); colormap(obs_color);								\
+					tempzone_handles(3*j-1) = patch(x(1,:)', y(1,:)', z(1,:)', obs_color, 'FaceAlpha', obs_alpha);									\
+					tempzone_handles(3*j)	= patch(x(2,:)', y(2,:)', z(2,:)', obs_color, 'FaceAlpha', obs_alpha);									\
+				end; clear x y z M T Tinv beta h1 h2;"	);
+		}
+	}
+}
+
 void PlotEndEffectorPathInMATLAB( int n, double epsilon, double* w, int n_cuboids_total, struct obstacles* obs, struct geom *G, struct DHparams *DH, 
 	int pathlen_new, double** path_new, Engine* matlab ) {
 	
@@ -470,13 +492,13 @@ void PlotEndEffectorPathInMATLAB( int n, double epsilon, double* w, int n_cuboid
 		return;
 	}
 
-	int plot_intermediate_configs = 0,		plot_coords = 0;
+	int plot_intermediate_configs = 0,		plot_coords = 1;
 	double epsilon_sq		= pow( epsilon, 2.0 ),		*x_end_eff = NULL,		*y_end_eff = NULL,		*z_end_eff = NULL;
 	double* q				= (double*)	malloc( n*sizeof(double) );
 	int* end_eff_indices	= (int*) malloc( pathlen_new*sizeof(int) );
 
-	/* Create variables for storage of link geometry coordinates */
-	int n_points = SumInts(G->N_coords, n);
+	/* Create variables for storage of link geometry coordinates (the last point is the representative end effector position, "grip_pos") */
+	int n_points = SumInts(G->N_coords, n+2);
 	struct coords C;
 	C.x = (double*) malloc(n_points*sizeof(double));
 	C.y = (double*) malloc(n_points*sizeof(double));
@@ -484,7 +506,6 @@ void PlotEndEffectorPathInMATLAB( int n, double epsilon, double* w, int n_cuboid
 
 	/* Delete old plots (if they exist). */
 	engEvalString( matlab, "if(exist('plane_handles','var') & ishandle(plane_handles) );		delete(plane_handles);		end;	\
-							if(exist('tempzone_handles','var') & ishandle(tempzone_handles) );	delete(tempzone_handles);	end;	\
 							if(exist('Cdata','var') && ishandle(Cdata) );						delete(Cdata);				end;	\
 							if(exist('linkdata','var') & ishandle(linkdata) );					delete(linkdata);	 		end;	\
 							if(exist('end_eff_traj', 'var') && ishandle(end_eff_traj) )			delete([end_eff_traj; end_eff_path_trav; end_eff_path_old_handle]); end;"	);
@@ -493,21 +514,7 @@ void PlotEndEffectorPathInMATLAB( int n, double epsilon, double* w, int n_cuboid
 	}
 
 	/* Plot temperature zones (part of dynamic obstacle environment - may have changed since last call to function) */
-	if ( obs->n_temp_zones > 0 ) {
-		assert( SendArraysToMATLAB( __LINE__, matlab, 5,	"n_temp_zones", Int,0, 1,1,1, obs->n_temp_zones,
-			"beta", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->beta,		"h1", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->h1,
-			"h2", Double,1, 1,1,obs->n_temp_zones, obs->temp_zones->h2,			"Tinv", Double,3, obs->n_temp_zones,4,4, obs->temp_zones->Tinv	)  == EXIT_SUCCESS );
-		engEvalString( matlab, "tempzone_handles = zeros(3*n_temp_zones,1); figure(TRAJfig);														\
-			for j = 1:n_temp_zones;																												\
-				[x,y,z] = cylinder( [h1(j)*tand(beta(j)), h2(j)*tand(beta(j))], 30 );					z = (h2(j)-h1(j)).*z + h1(j);			\
-				T(1:3,1:3,j) = Tinv(1:3,1:3,j)';		T(1:3,4,j) = -T(1:3,1:3,j)*Tinv(1:3,4,j);	T(4,:,j) = Tinv(4,:,j);						\
-				x = x(:)'; y = y(:)'; z = z(:)';		M = T(:,:,j)*[x; y; z; ones(1,length(x))];												\
-				x = reshape(M(1,:),2,numel(x)/2);		y = reshape(M(2,:),2,numel(y)/2);				z = reshape(M(3,:),2,numel(z)/2);		\
-				tempzone_handles(3*j-2) = surf(x,y,z,ones(size(z)), 'FaceAlpha', obs_alpha); colormap(obs_color);								\
-				tempzone_handles(3*j-1) = patch(x(1,:)', y(1,:)', z(1,:)', obs_color, 'FaceAlpha', obs_alpha);									\
-				tempzone_handles(3*j)	= patch(x(2,:)', y(2,:)', z(2,:)', obs_color, 'FaceAlpha', obs_alpha);									\
-			end; clear x y z M T Tinv beta h1 h2;"	);
-	}
+	PlotTempObstaclesInMATLAB( obs, matlab );
 
 	/* Initialize a linkdata handles matrix to keep track of robot config plots.  Plot the initial manipulator configuration. */
 	assert( SendArraysToMATLAB( __LINE__, matlab, 1,	"pathlen_new", Double,0, 1,1,1, (double) pathlen_new ) == EXIT_SUCCESS );

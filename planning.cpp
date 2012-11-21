@@ -40,7 +40,6 @@ void Halton( int* sequence, int length, int D, double** h ) {
 	}
 }
 
-
 void Sample( int feedback_mode, char* sampling, int n, double** Q, double* q_max, double* q_min, int* iter, double* q ) {
 	
 	if (feedback_mode == 0) {
@@ -204,7 +203,6 @@ void NearestNeighbors(struct tree *T, int num_nodes, double* q, int n, double* w
 	free(I);
 }
 
-
 int Extend(double* q, double* q_near, double epsilon, int n, double* w, double* q_new, struct obstacles* obs, struct geom *G, struct DHparams *DH, double* cost_to_go, int indicator) {
 
 	/* Steer from q_near to q, returning new state q_new (which lies within a distance-squared of epsilon from q_near) */
@@ -352,7 +350,6 @@ void AddLeafToLists(struct tree *T, int leaf_index) {
 	}
 }
 
-
 int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, int n, double* w, int* iter, int max_iter, char* soln, char* sampling, 
 	double** Q, double* q_max, double* q_min, char* NN_alg, int max_neighbors, double eta_RRT, double gamma_RRT, double epsilon, int obs_indicator,
 	struct obstacles* obs, struct geom *G, struct DHparams *DH, int* node_star_index, char load_trees, char* filename, int I, fpos_t *fpos, Engine* matlab ) {
@@ -423,7 +420,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 	double *q_new   = (double*) malloc(n*sizeof(double));
 	assert( neighbors != NULL && costs != NULL && q != NULL && q_near != NULL && q_new != NULL);
 
-	/* Identify if the trees to-be-built are new based on the current value of "iter".  Determines whether currently in feedback or not. */
+	/* Identify if the trees to-be-built are new based on the current value of "iter".  Determines whether currently executing plans or not. */
 	int feedback_mode	= 0;
 	if (*iter > 1) feedback_mode = 1;
 
@@ -499,7 +496,7 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 				}
 			}
 
-			/* Increment "iter".  If in feedback mode, exit the function after a single iteration. */
+			/* Increment "iter". If in feedback mode, exit the tree construction phase after a single iteration. */
 			*iter = *iter + 1;
 			if (feedback_mode == 1) {
 				num_nodes[0]	= num_nodesA;
@@ -507,17 +504,17 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 				goto END_OF_FUNCTION;
 			}
 
-			/* Report every 10% of progress to the console window */
-			if ( ((10*(*iter)) % max_iter) == 0 ) {
-				printf("\t%02d%s\n", (100*(*iter))/max_iter, "% complete...");
-			}
-
 			/* Swap tree pointers to alternate between "extending" or "connecting" for each tree */
 			temp_tree_ptr = Ta;			temp_int	= num_nodesA;
 			Ta		= Tb;				num_nodesA	= num_nodesB;
 			Tb		= temp_tree_ptr;	num_nodesB	= temp_int;
 
-			/* Break the loop if a feasible solution has been found and only one is desired */
+			/* Report every 10% of progress to the console window */
+			if ( ((10*(*iter)) % max_iter) == 0 ) {
+				printf("\t%02d%s\n", (100*(*iter))/max_iter, "% complete...");
+			}
+
+			/* Break the loop if a feasible solution has been found and only one is desired. */
 			if ( (feasible == 1 && strncmp(soln, "feasible", 8) == 0) ) {
 				break;
 			}
@@ -526,9 +523,9 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 		/* If "iter" is even, an odd-number of loops was conducted (and therefore an odd number of swaps), and vice versa. If this is so, 
 		Ta and Tb are now mixed-up from their original order.  Swap them back into place (to correspond with n_nodes and treefiles again). */
 		if ((*iter % 2) == 0) {
-			temp_tree_ptr = Ta;			temp_int	= num_nodesA;		//temp_int2 = node_star_index[0];
-			Ta		= Tb;				num_nodesA	= num_nodesB;		//node_star_index[0] = node_star_index[1];
-			Tb		= temp_tree_ptr;	num_nodesB	= temp_int;			//node_star_index[1] = temp_int2;
+			temp_tree_ptr = Ta;			temp_int	= num_nodesA;
+			Ta		= Tb;				num_nodesA	= num_nodesB;
+			Tb		= temp_tree_ptr;	num_nodesB	= temp_int;
 		}
 
 		/* For all parent nodes of connected leaves, add to their "leaf_lists" the indices of the leaves they are connected to.
@@ -668,7 +665,6 @@ int BuildRRTs(struct tree *Ta, struct tree *Tb, int* n_nodesA, int* n_nodesB, in
 	
 	return feasible;
 }
-
 
 int* TracePath(struct tree *T, int node1, int node2, int *pathlen) {
 	int a		= node1;
@@ -989,7 +985,55 @@ int ExhaustiveRePlan(struct tree **T_ptrs, int* n_nodes, double eta_RRT, double 
 		return unsafe;
 }
 
-void ResetSimulation( struct tree* trees, int n_trees, int n_plans, int* num_nodes, int* feasible, int** node_star_index, struct obstacles* obs, Engine* matlab ) {
+
+void EmergencyPlan( double* q, double* q_emergency, double* q_waypoints, int n, int n_emergency, double* w,
+	double epsilon_sq, CPhidgetAdvancedServoHandle servo, int* channels, int plan_num ) {
+
+	double minDist = DBL_MAX, dist;
+	int minDist_index = -1, increment;
+
+	for (int i = 0; i < n_emergency; i++) {
+		dist = DistSq(q, &q_emergency[i*n], n, w);
+		if (dist < minDist) {
+			minDist = dist;
+			minDist_index = i;
+		}
+	}
+
+	if (plan_num == 0) {
+		q_emergency = &(q_waypoints[n]);
+		n_emergency = 1;
+		minDist_index = 0;
+	} else if (plan_num == 1) {
+		increment = REVERSE;
+	} else {
+		increment = FORWARD;
+	}
+
+	if( minDist_index >= 0) {
+		for (int j = minDist_index; (j >= 0 && j < n_emergency); j += increment ) {
+			for (int k = 0; k < n; k++) {
+				CPhidgetAdvancedServo_setPosition(servo, channels[k], Deg2Command((&q_emergency[n*j])[k]));
+			}
+			do {
+				for (int k = 0; k < n; k++) {
+					CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
+					q[k] = Command2Deg(q[k]);
+				}
+			} while (DistSq(q, &q_emergency[n*j], n, w) > epsilon_sq);
+		}
+	}
+	
+}
+
+void ResetSimulation( char reset_trees, struct tree* trees, int n_trees, int n_plans, int* num_nodes, int* num_nodes_precomputed,
+	int* feasible, int** node_star_index, struct obstacles* obs, Engine* matlab ) {
+	
+	/* If requesting a tree reset after each run, return to the original trees by truncating the number of nodes to their original values */
+	if (strncmp(&reset_trees, "y", 1) == 0) {
+		for (int i = 0; i < n_trees; i++) num_nodes[i] = num_nodes_precomputed[i];
+	}
+	
 	/* Reset node safety properties back to 1 and remove any temperature obstacles from the previous run */
 	obs->n_temp_zones = 0;
 	for (int i = 0; i < n_trees; i++) {
@@ -1015,8 +1059,6 @@ void ResetSimulation( struct tree* trees, int n_trees, int n_plans, int* num_nod
 		engEvalString( matlab, "close( TRAJfig, PLANfig ); clear all;");
 	}
 }
-
-
 
 void GenerateSamples(double** Q, char* sampling, int n, int max_iter, double* q_max, double* q_min, char* filename) {
 	
@@ -1066,4 +1108,3 @@ void GenerateSamples(double** Q, char* sampling, int n, int max_iter, double* q_
 
 	assert(Q != NULL);
 }
-

@@ -132,19 +132,19 @@ void GenerateObstacles( struct obstacles *obs, int n_planes, double* nhat_planes
 		cuboids->a[6*i] = T[0][0];								cuboids->a[6*i+1] = -T[0][0];	
 		cuboids->b[6*i] = T[0][1];								cuboids->b[6*i+1] = -T[0][1];	
 		cuboids->c[6*i] = T[0][2];								cuboids->c[6*i+1] = -T[0][2];	
-		cuboids->d[6*i] = T[0][3] - LWH_cuboids[3*i]/2.0;		cuboids->d[6*i+1] = -( T[0][3] + LWH_cuboids[3*i]/2.0 );
+		cuboids->d[6*i] = T[0][3] - LWH_cuboids[3*i]/2.0;		cuboids->d[6*i+1] = -T[0][3] + LWH_cuboids[3*i]/2.0;
 
 		/* Right face											Left face */
 		cuboids->a[6*i+2] = T[1][0];							cuboids->a[6*i+3] = -T[1][0];
 		cuboids->b[6*i+2] = T[1][1];							cuboids->b[6*i+3] = -T[1][1];
 		cuboids->c[6*i+2] = T[1][2];							cuboids->c[6*i+3] = -T[1][2];
-		cuboids->d[6*i+2] = T[1][3] - LWH_cuboids[3*i+1]/2.0;	cuboids->d[6*i+3] = -( T[1][3] + LWH_cuboids[3*i+1]/2.0 );
+		cuboids->d[6*i+2] = T[1][3] - LWH_cuboids[3*i+1]/2.0;	cuboids->d[6*i+3] = -T[1][3] + LWH_cuboids[3*i+1]/2.0;
 
 		/* Top face												Bottom face */
 		cuboids->a[6*i+4]  = T[2][0];							cuboids->a[6*i+5]  = -T[2][0];
 		cuboids->b[6*i+4]  = T[2][1];							cuboids->b[6*i+5]  = -T[2][1];
 		cuboids->c[6*i+4]  = T[2][2];							cuboids->c[6*i+5]  = -T[2][2];
-		cuboids->d[6*i+4]  = T[2][3] - LWH_cuboids[3*i+2]/2.0;	cuboids->d[6*i+5]  = -( T[2][3] + LWH_cuboids[3*i+2]/2.0 );
+		cuboids->d[6*i+4]  = T[2][3] - LWH_cuboids[3*i+2]/2.0;	cuboids->d[6*i+5]  = -T[2][3] + LWH_cuboids[3*i+2]/2.0;
 	}
 
 	/* Re-position the cuboidal obstacle corresponding to the grasped object to the final element of "cuboids" (for easy removal later) */

@@ -119,15 +119,13 @@ int* Dec2BaseInts(int num, int base, int *ptr_N);
 on the setting *load_input* specified by the user.  Requires that *filename* fully-specify the path and filename root.  \see main
 	\param[in] filename		String containing the full path + root of input filename
 	\param[in] load_input	`char` indicating whether to load a previous file ('y') or save a new one ('n') */
-void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, int* max_neighbors, double* epsilon,
-					int* n, int* n_waypoints, double* q_waypoints, double* q_min, double* q_max, int* grip_actions,
-					double* grip_angles, int* n_facepts, double* L, double* W, double* H, double* rho_x, double* rho_y,
-					double* rho_z, double* d, double* a, double* alpha, int* n_planes, double* nhat_planes, double* xyz_planes,
-					int* n_cylinders, double* YPR_cylinders, double* xyz_cylinders, double* r_cylinders, double* H_cylinders,
-					int* n_cuboids, double* YPR_cuboids, double* LWH_cuboids, double* xyz_cuboids, char load_input );
+void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, int* max_neighbors, double* epsilon, 
+					int* n, int* n_waypoints, double* q_waypoints, double* q_min, double* q_max, int* grip_actions, 
+					double* grip_angles, double* grip_sep, double* grip_pos, int* n_facepts, double* L, double* W, double* H, 
+					double* rho_x, double* rho_y, double* rho_z, double* d, double* a, double* alpha, int* n_planes, 
+					double* nhat_planes, double* xyz_planes, int* n_cylinders, double* YPR_cylinders, double* xyz_cylinders, 
+					double* r_cylinders, double* H_cylinders, int* n_cuboids, double* YPR_cuboids, double* LWH_cuboids, 
+					double* xyz_cuboids, char load_input );
 	
-
-
-
 
 #endif
