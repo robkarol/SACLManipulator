@@ -1,7 +1,6 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -10,6 +9,11 @@
 #include <float.h>
 #include <windows.h>
 #include <time.h>
+#include <sys/timeb.h>
+#include <iostream>
+#include <string.h>
+
+using namespace std;
 
 #ifndef PI
 	#define PI 3.1415926535897932385
@@ -127,5 +131,8 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 					double* r_cylinders, double* H_cylinders, int* n_cuboids, double* YPR_cuboids, double* LWH_cuboids, 
 					double* xyz_cuboids, char load_input );
 	
+
+
+char WaitForKey(double maxTimespan);
 
 #endif

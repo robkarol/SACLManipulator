@@ -115,8 +115,8 @@ variant of the `RRT*-Connect` Algorithm that has been adapted for fast re-planni
 #include "kdtree.h"
 #include "matlab_interface.h"
 #include "phidget_interface.h"
-#include <iostream>
-#include <stdio.h>
+#include "log.h"
+
 
 using namespace std;
 
@@ -129,9 +129,14 @@ using namespace std;
 /*! Main function for running the manipulator RRT code.  Code for controlling the Stanford SACL manipulator.  Enter all static input parameters here, including
 general user settings, goal waypoint profile, manipulator geometry, obstacle parameters, manipulator hardware parameters, and closed-loop simulation parameters. */
 int main() {
+
+	Log::SetReportingLevel(logDEBUG);
+
+	LOG(logDEBUG) << "MANIPULATOR RRT Motion Planner" <<endl;
+	LOG(logDEBUG) << "------------------------------" <<endl;
+
 	setbuf(stdout, (char*) 0);										/* Completely flush output buffer on early termination so that the location of a program failure is not misidentified */
-	printf("\nMANIPULATOR RRT Motion Planner\n");
-	printf("------------------------------\n");
+
 
 	/*+=======================+*/
 	/*| Enter User Input here |*/
@@ -141,8 +146,8 @@ int main() {
 	char load_previous			= 'y';								/* Load a previous run? (y/n) */
 	char disp_matlab_plots		= 'y';								/* Display MATLAB plots? (y/n/a) [a = "all" (also plots RRT figures, which is very time-consuming)] */
 	char reset_trees			= 'n';								/* Reset the trees during simulation resets? (y/n) */
-	char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
-	//char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
+	//char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
+	char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
 	//char filename[FILENAME_MAX] = "C:/Users/Joe/Desktop/SACL/RRT";
 	char soln[11]				= "suboptimal";						/* Type of solution to seek: "feasible" (exit at 1st solution found), "suboptimal" (attempt to find "max_neighbors" # of solutions) */
 	char sampling[13]			= "halton";							/* Sampling sequence: "pseudorandom", "halton" */
@@ -243,8 +248,8 @@ int main() {
 	double grip_VelLimThrottle	= 1.0;								/* Set the velocity limit of the end effector actuator as a fraction from VelMin to VelMax */
 	
 	//char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	//char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
+	//char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
+	char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
 	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 4.0, 4.0, 4.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
 	double pos_y_tempsensors[]  = { 0.0, -1.3, 0.0, 0.0, -1.0, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
 	double pos_z_tempsensors[]  = { 1.25, 0.0, -1.25, 0.9, 0.0, -0.9 };			/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
@@ -265,7 +270,7 @@ int main() {
 	// Demos: 8.0 s, 6		10.0 s, 2		11.0 s, 5		8.0,13.0 6,5
 
 	/* Verify that user data has been input correctly */
-	printf("%s\n", "Verifying input...");
+	LOG(logINFO) << "Verifying input...";
 	assert( strncmp(&load_previous, "n", 1) == 0		|| strncmp(&load_previous, "y", 1) == 0 );
 	assert( strncmp(&disp_matlab_plots, "n", 1) == 0	|| strncmp(&disp_matlab_plots, "y", 1) == 0			|| strncmp(&disp_matlab_plots, "a", 1) == 0 );
 	assert( strncmp(NN_alg, "brute_force", 11) == 0		|| strncmp(NN_alg, "kd_tree", 7) == 0 );
@@ -298,7 +303,7 @@ int main() {
 	max_t_rebuild			= 1000*max_t_rebuild;		// Convert the maximum rebuild time into milliseconds
 
 	/* Create a structure for storage of link geometry */
-	printf("Creating structures for input variable storage...\n");
+	LOG(logINFO) << "Creating structures for input variable storage...";
 	struct geom *G	= (struct geom*) malloc( sizeof(struct geom) );
 	G->L			= L;			G->W		= W;			G->H			= H;
 	G->rho_x		= rho_x;		G->rho_y = rho_y;			G->rho_z		= rho_z;
@@ -336,18 +341,18 @@ int main() {
 	/* Check feasibility of all waypoints */
 	double* q_test = (double*) malloc( n*sizeof(double) );
 	for (int i = 0; i < n_waypoints; i++) {
-		printf("%s%02d%s\n", "Checking feasibility of waypoint #", i+1,"...");
+		LOG(logINFO) <<  "Checking feasibility of waypoint #"<< i+1;
 		for (int j = 0; j < n; j++) {
 			q_test[j] = q_waypoints[i*n + j];
 		}
 		if ( ConstraintViolation( q_test, n, obs, G, DH, 0 ) != false) {
-			fprintf(stderr, "\tWaypoint infeasible.  Please check that waypoint #%i\n\t and/or geometry values have been entered correctly...", i+1);
+			LOG(logERROR) << "Waypoint infeasible.  Please check that waypoint #" << i+1 <<" and/or geometry values have been entered correctly...";
 			exit(EXIT_FAILURE);
 		}
 	}
 
 	/* Generate set of sample points */
-	printf("Generating samples of the manipulator C-space...\n");
+	LOG(logINFO) << "Generating samples of the manipulator C-space...";
 	double** Q = Make2DDoubleArray(max_iter, n);
 	GenerateSamples( Q, sampling, n, max_iter, q_max, q_min, filename );
 
@@ -395,10 +400,10 @@ int main() {
 	/* Open MATLAB Engine and generate plots. */
 	Engine* matlab = NULL;
 	if ( (strncmp( &disp_matlab_plots, "y", 1) == 0) || strncmp( &disp_matlab_plots, "a", 1) == 0 ) {
-		printf("Opening MATLAB Engine for generating plots...\n");
+		LOG(logINFO) << "Opening MATLAB Engine for generating plots...";
 		matlab = engOpen("\0");
 		if (matlab == NULL) {
-			fprintf(stderr, "\tCan't start MATLAB engine...\n");
+			LOG(logERROR) << "Can't start MATLAB engine...";
 			goto GENERATE_RRTs;
 		}
 		engEvalString(matlab, "clear all; close all;	scrsz = get(0,'ScreenSize');	figdims = [0.5, 0.75];		fontsize = 12;		titlesize = 14;");
@@ -434,7 +439,7 @@ int main() {
 	}
 	
 	for (int i = 0; i < n_plans; i++) {
-		printf("Constructing motion plan #%02d...\n", i+1);
+		LOG(logINFO) << "Constructing motion plan #" << i+1;
 
 		/* Set the first and last waypoints of the current motion plan as the roots of the forward tree and reverse tree, respectively. */
 		for (int j = 0; j < n; j++) {
@@ -467,9 +472,9 @@ int main() {
 			 NN_alg, max_neighbors, eta_RRT, gamma_RRT, epsilon, obs_indicator, obs, G, DH, node_star_index[i], load_previous, filename, i, &fpos, matlabRRT );
 		t_end	= clock();
 
-		printf("\tMotion plan generated in %5.5Lf s...\n", ElapsedTime( t_start, t_end )/1000 );
+		LOG(logINFO) << "Motion plan generated in "<<ElapsedTime( t_start, t_end )/1000<<" s";
 		if (feasible[i] != 1) {
-			printf("\tNo open-loop path found for plan #%02d.  Terminating calculations...\n", i+1);
+			LOG(logINFO) << "No open-loop path found for plan #"<<setw(2)<<i+1<<". Terminating calculations...";
 			break;
 		}
 	}
@@ -553,12 +558,12 @@ int main() {
 	char user_input[]	= "n";
 	double **path;
 
-	printf("Initializing the manipulator arm and temperature sensors...\n");
+	LOG(logINFO) << "Initializing the manipulator arm and temperature sensors...";
 	(CPhidgetAdvancedServoHandle) servo = InitializeServos(n, channels, grip_channel, AccelThrottle, VelLimThrottle, grip_AccelThrottle, grip_VelLimThrottle);
 	ifKit	= NULL;
 	// (CPhidgetInterfaceKitHandle) ifKit	= InitializeTempSensors(n_tempsensors, sensor_channels, rate_tempsensors);
 	if (servo == NULL) {
-		printf("Printing pre-computed best paths to file and terminating code...\n");
+		LOG(logINFO) << "Printing pre-computed best paths to file and terminating code...";
 		for (int i = 0; i < n_plans; i++) {
 			if (feasible[i] != 1) break;
 			if (i == grip_actions[0]) {
@@ -582,13 +587,18 @@ int main() {
 		PlotEndEffectorPathInMATLAB( n, epsilon, w, n_cuboids_total, obs, G, DH, 1, &(path[index-1]), matlab );
 
 		if (matlab != NULL) {
-			printf("Close figures and quit MATLAB? (y/n + ENTER): ");	fflush(stdout);		scanf("%s", user_input);
-			if ( strncmp( user_input, "y", 1 ) == 0 )	
-			{
+			printf("Close figures and quit MATLAB? (y/n): ");
+			fflush(stdout);	
+			//scanf("%s", user_input);			
+			char x = WaitForKey(10);			
+			printf("%s", x);
+			if ( x == 'y' )	{
 					engEvalString(matlab, "close all; quit;");
 			}
+			
 		}
-		printf("END\n");	Sleep(1500);		exit(1);
+		LOG(logINFO) << "END";
+		Sleep(1500);		exit(1);
 	}
 
 	// Normalize temperature sensor normal vectors
@@ -604,7 +614,7 @@ int main() {
 	/*+===============================================================================+*/
 
 	/* Define variables used during motion plan execution. */
-	printf("Beginning motion...\n");
+	LOG(logINFO) <<"Beginning motion...";
 	int unsafe = 0, new_temp = 0, num_replans, fakeobs_index = 0, violation, ready_flag;
 	double pos_maxheat[6] = { 0.0 }, n_hat_tempobs[3] = { 0.0 }, q_grip, epsilon_sq = pow(epsilon,2.0);
 	double* q				= (double*) malloc(n*sizeof(double));
@@ -616,12 +626,12 @@ int main() {
 	clock_t t_beginmotion, t_current;					// Timers for updating the trajectory after each fixed horizon time
 
 	/* Assign the manipulator initial position */
-	printf("Assigning initial configuration...\n");
+	LOG(logINFO) << "Assigning initial configuration...";
 	for (int k = 0; k < n; k++) CPhidgetAdvancedServo_setPosition(servo, channels[k], Deg2Command(q_waypoints[k]) );
 	CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[0]));
 
 	/* Engage arm actuators.  Wait for the arm to reach its initial configuration. */
-	printf("Engaging arm actuators...\n");
+	LOG(logINFO) << "Engaging arm actuators...";
 	for (int i = 0; i < n; i++) CPhidgetAdvancedServo_setEngaged(servo, channels[i], 1);
 	CPhidgetAdvancedServo_setEngaged(servo, grip_channel, 1);
 
@@ -636,7 +646,7 @@ int main() {
 	/* Open the temperature sensor file for reading (or, if using simulated sensors, tempsensor_file must equal "") */
 	file_ptr = fopen( tempsensor_file, "r" );
 	if (file_ptr == NULL && strlen(tempsensor_file) > 0) {
-		printf("\tCould not read tempsensor file.  Exiting...");
+		LOG(logERROR) << "Could not read tempsensor file.  Exiting...";
 		exit(1);
 	}
 
@@ -660,7 +670,7 @@ int main() {
 			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[1], n );
 			obs->n_cuboids = obs->n_cuboids - 1;		// Remove the grasped object from consideration in obstacle collisions
 			
-			printf("\tGrasping target object...\n");
+			LOG(logINFO) <<"Grasping target object...";
 			CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[1]));
 			do { 
 				CPhidgetAdvancedServo_getPosition(servo, grip_channel, &q_grip );
@@ -669,7 +679,7 @@ int main() {
 		else if (i == grip_actions[1]) {
 			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[2], n );
 
-			printf("\tDropping target object...\n");
+			LOG(logINFO) << "Dropping target object...";
 			CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[2]));
 			do { 
 				CPhidgetAdvancedServo_getPosition(servo, grip_channel, &q_grip );
@@ -677,7 +687,7 @@ int main() {
 		}
 		
 		/* For plan i, reconstruct the best path for the manipulator arm from the pre-computed trees.  If no path exists, exit the loop and shutdown. */
-		printf("Building motion plan #%02d...\n", i+1);
+		LOG(logINFO) << "Building motion plan #"<<i+1;
 		if (feasible[i] == 1) {
 			pathA	= TracePath( &(trees[2*i]), node_star_index[i][0], 0, &pathlenA );
 			pathB	= TracePath( &(trees[2*i+1]), node_star_index[i][1], 0, &pathlenB );
@@ -687,12 +697,12 @@ int main() {
 			PlotEndEffectorPathInMATLAB( n, epsilon, w, n_cuboids_total, obs, G, DH, pathlenA + pathlenB, path, matlab );
 		}
 		else {
-			printf("%s%02d%s", "\tNo open-loop path found for plan #", i+1, ".  Terminating motion...\n");
+			LOG(logINFO) << "No open-loop path found for plan #"<< i+1<< ".  Terminating motion...";
 			goto END_MOTION_PLAN;
 		}
 
 		/* Execute plan i, if it was found to be feasible.  Begin the timer. */
-		printf("Executing motion plan #%02d...\n", i+1);
+		LOG(logINFO) << "Executing motion plan #"<< i+1;
 		index	= 0;
 		t_start = clock();
 		do {
@@ -748,7 +758,7 @@ int main() {
 				if (violation == 1) {
 
 					/* Stop moving and determine current configuration */
-					printf("\tTemperature constraints violated.  Halting motion and constructing temperature obstacle...\n");
+					LOG(logINFO) << "Temperature constraints violated.  Halting motion and constructing temperature obstacle...";
 					/*if (index > 0) {
 						for (int k = 0; k < n; k++) {
 							CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q_current[k]));
@@ -815,8 +825,10 @@ int main() {
 				if ((ElapsedTime( t_start, t_end ) >= max_t_horizon) || (unsafe == 1) ) {
 					/* If unsafe or the time has exceeded its allowable limit, stop moving and determine the current configuration */
 					if (unsafe == 1) {
-						printf("\tUnsafe due to temperature obstacle(s).  Formulating new plan...\n");
-					} else printf("\tExceeded allowed horizon time.  Formulating new plan...\n");
+						LOG(logINFO) <<"Unsafe due to temperature obstacle(s).  Formulating new plan...";
+					} else {
+						LOG(logINFO) <<"\tExceeded allowed horizon time.  Formulating new plan...";
+					}
 
 					for (int k = 0; k < n; k++) {
 						CPhidgetAdvancedServo_getPosition(servo, channels[k], &(q[k]));
@@ -827,13 +839,13 @@ int main() {
 					SplitPathAtNode( path, q, w, pathA, pathB, pathlenA, index, &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, NN_alg, matlabRRT );
 					
 					if ( ConstraintViolation( q, n, obs, G, DH, 2 ) == 1 ) {
-						printf("\tMeasured point is unsafe!!!\n");
-						cout << "\tJoint angles "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
+						LOG(logWARNING) <<"Measured point is unsafe!!!";
+						LOG(logWARNING) << "\tJoint angles "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
 						if (index > 0) {
 							for (int k = 0; k < n; k++) {
 								q[k] = path[index-1][k];
 							}
-							cout << "Redefined q to "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
+							LOG(logWARNING) << "\tRedefined q to "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
 						}
 					}
 
@@ -869,7 +881,7 @@ int main() {
 					switch (unsafe) {
 						case 1:
 							
-							printf("\tCould not find safe path. Aborting motion plan...\n");
+							LOG(logWARNING) << "Could not find safe path. Executing emergency plan...";
 							// execute emergency plan
 							EmergencyPlan( q, q_emergency, q_waypoints, n, n_emergency, w, epsilon_sq, servo, channels, i);
 							emergency_plan_bool = 1;
@@ -898,7 +910,8 @@ int main() {
 							//	goto END_MOTION_PLAN;	//TODO: get rid of GOTO!!! what happens to plans when this GOTO is called?
 							//}
 					
-						case 0:
+						case 0:							
+							LOG(logINFO) << "replaning generated safe motion plan...";
 							PlotPathInMATLAB( i, index, pathlenA + pathlenB, n, path, matlab );
 							PlotEndEffectorPathInMATLAB( n, epsilon, w, n_cuboids_total, obs, G, DH, pathlenA + pathlenB, path, matlab );
 							t_start = clock();			// Reset the timer.
@@ -930,7 +943,7 @@ int main() {
 		memcpy( q, path[index-1], n*sizeof(double) );
 		for (int k = pathlenA + pathlenB - 1; k >= 0; k--) free(path[k]);
 		free(path); free(pathA); free(pathB);
-		printf("free path and go to next one\n"); 
+		LOG(logINFO) <<"free path and go to next one"; 
 	}
 
 	/*+============================================================+*/
@@ -940,7 +953,7 @@ int main() {
 
 	if ( unsafe == 0 ) {
 		/* Reset the gripper position at the end of a successful motion plan */
-		printf("Resetting end effector...\n");
+		LOG(logINFO) << "Resetting end effector...";
 		CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[0]));
 		Sleep(3000);
 	
@@ -953,8 +966,10 @@ int main() {
 
 	/* Prompt to run again, if desired.  If "y", reset the simulation by resetting trees, replotting, and clearing variables. */
 	printf("Run the simulation again? (y/n): "); fflush(stdout);
-	scanf("%s", user_input);
-	if (strncmp(user_input, "y", 1) == 0) {
+	char x = WaitForKey(10);
+	printf("%s", x);
+
+	if (x != 'n') {
 		
 		/* Reset simulation for a new run.  Return everything to their original state before motion plan execution except for the
 		trees (which have grown to include more nodes). */
@@ -966,7 +981,7 @@ int main() {
 	}	
 
 	// Disengage the actuators and shutdown
-	printf("Disengaging actuators and shutting down...\n");
+	LOG(logINFO) << "Disengaging actuators and shutting down...";
 	for (int i = 0; i < n; i++) CPhidgetAdvancedServo_setEngaged(servo, channels[i], 0);
 	CPhidgetAdvancedServo_setEngaged(servo, grip_channel, 0);
 	Sleep(1000);
@@ -977,9 +992,10 @@ int main() {
 	CPhidget_delete((CPhidgetHandle) ifKit);
 
 	if (matlab != NULL) {
-		printf("Close figures and quit MATLAB? (y/n + ENTER): "); fflush(stdout);
-		scanf("%s", user_input);
-		if ( strncmp( user_input, "y", 1 ) == 0 )
+		printf("Close figures and quit MATLAB? (y/n): "); fflush(stdout);
+		//scanf("%s", user_input);
+		char x = WaitForKey(10);
+		if ( x == 'y' )
 		{
 			engEvalString(matlab, "close all; quit;");
 			engClose(matlab);
@@ -991,7 +1007,7 @@ int main() {
 	/*+============================================+*/
 
 	/* Free memory from heaps */
-	printf("Freeing memory...\n");
+	LOG(logINFO) <<"Freeing memory..n";
 	for (int i = 0; i <= n+1; i++)
 	{
 		for (int j = 0; j < 3; j++)
@@ -1060,6 +1076,6 @@ int main() {
 	for (int j = n_plans-1; j >= 0; j--) free(node_star_index[j]);
 	free(node_star_index);
 
-	printf("END\n");
+	LOG(logINFO) <<"END";
 	return 0;
 }

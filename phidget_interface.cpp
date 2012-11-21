@@ -1,5 +1,6 @@
 #include "phidget_interface.h"
 #include "stdio.h"
+#include "log.h"
 
 int CCONV AttachHandler(CPhidgetHandle HANDLE, void *userptr) {
 	int serialNo;
@@ -7,7 +8,7 @@ int CCONV AttachHandler(CPhidgetHandle HANDLE, void *userptr) {
 
 	CPhidget_getDeviceName(HANDLE, &name);
 	CPhidget_getSerialNumber(HANDLE, &serialNo);
-	printf("\t%s %10d attached!\n", name, serialNo);
+	LOG(logINFO) <<  name << " "<<serialNo <<" attached!";
 	return 0;
 }
 
@@ -17,12 +18,12 @@ int CCONV DetachHandler(CPhidgetHandle HANDLE, void *userptr) {
 
 	CPhidget_getDeviceName(HANDLE, &name);
 	CPhidget_getSerialNumber(HANDLE, &serialNo);
-	printf("\t%s %10d detached!\n", name, serialNo);
+	LOG(logINFO) <<  name << " " <<serialNo <<" dettached!";
 	return 0;
 }
 
 int CCONV ErrorHandler(CPhidgetHandle HANDLE, void *userptr, int ErrorCode, const char *Description) {
-	printf("\tError handled. %d - %s\n", ErrorCode, Description);
+	LOG(logERROR) << "Error handled. "<< ErrorCode <<": "<< Description;
 	return 0;
 }
 
@@ -47,10 +48,10 @@ CPhidgetAdvancedServoHandle InitializeServos(int n, int* channels, int grip_chan
 	/* Open the device for connections */
 	CPhidget_open((CPhidgetHandle)servo, -1);
 
-	printf("Waiting for servos to be attached...\n"); 
+	LOG(logINFO) << "Waiting for servos to be attached..."; 
 	if ((result = CPhidget_waitForAttachment((CPhidgetHandle)servo, 5000))) {
 		CPhidget_getErrorDescription(result, &err);
-		printf("\tProblem waiting for attachment: %s\n", err);
+		LOG(logERROR) << "Problem waiting for attachment: "<< err;
 		return 0;
 	}
 
@@ -95,10 +96,10 @@ CPhidgetInterfaceKitHandle InitializeTempSensors(int n_tempsensors, int* sensor_
 	/* Open the interfacekit for device connections */
 	CPhidget_open((CPhidgetHandle)ifKit, -1);
 
-	printf("Waiting for interface kit to be attached...\n");
+	LOG(logINFO) << "Waiting for interface kit to be attached...";
 	if((result = CPhidget_waitForAttachment((CPhidgetHandle)ifKit, 5000))) {
 		CPhidget_getErrorDescription(result, &err);
-		printf("\tProblem waiting for attachment: %s\n", err);
+		LOG(logERROR) << "Problem waiting for attachment:" << err;
 		return 0;
 	}
 

@@ -1,5 +1,8 @@
 #include "utils.h"
-#include "planning.h" // critical reference here
+#include "planning.h" // TODO: this reference could lead to future difficulties
+#include "log.h"
+#include "conio.h"
+#include <time.h>;
 
 double ElapsedTime( clock_t start, clock_t stop ) {
 	return ((stop - start)*1000)/CLOCKS_PER_SEC;
@@ -309,7 +312,7 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 	time_t rawtime;
 
 	if (strncmp(&load_input, "n", 1) == 0) {
-		printf("Printing input and obstacle data to file...\n");
+		LOG(logINFO) << "Printing input and obstacle data to file...";
 		infilefid = fopen( strcat(filename, "input.dat"), "w+" );
 		time(&rawtime);
 		fprintf(infilefid, "%s\n%s\t%s%s\t%s\n%s\t%s\n",								"Manipulator RRT Input Data", "Last updated:    ", ctime(&rawtime), "Solution type:   ", soln, "Sampling method: ", sampling);
@@ -345,8 +348,10 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 		}
 	}
 	else if (strncmp(&load_input, "y", 1) == 0) {
-		printf("Loading input parameters and settings from file...\n");
-		infilefid = fopen( strcat(filename, "input.dat"), "r" );
+		LOG(logINFO) << "Loading input parameters and settings from file...";
+		char * file;
+		file = strcat(filename, "input.dat");
+		infilefid = fopen( file, "r" );
 
 		if (infilefid != NULL) {
 			fscanf(infilefid, "%*[^\n]\n%*[^\n]\n%*[^\t]\t%s\n%*[^\t]\t%s\n", soln, sampling );
@@ -375,7 +380,7 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 			}
 		}
 		else {
-			printf("ERROR: could not open input file.\n");
+			LOG(logINFO) << "Could not open input file ["<<file<<"]";
 		}
 	}
 
@@ -390,7 +395,9 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 	char c;
 
 	if (strncmp(&load_input, "n", 1) == 0) {
-		obsfilefid = fopen( strcat(filename, "obstacles.dat"), "w+");
+		char* file;
+		file = strcat( filename, "obstacles.dat");
+		obsfilefid = fopen( file, "w+");
 		if (obsfilefid != NULL) {
 			fprintf(obsfilefid, "%s\n", "Manipulator RRT Obstacle Data");
 			fprintf(obsfilefid, "%s\t%s\n", "nhat_planes", "xyz_planes");
@@ -412,11 +419,13 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 			}
 		}
 		else {
-			printf("ERROR: could not open obstacle file.\n");
+			LOG(logERROR) << "Could not open obstacle file ["<<file<<"]";
 		}
 	}
 	else if (strncmp(&load_input, "y", 1) == 0) {
-		obsfilefid = fopen( strcat(filename, "obstacles.dat"), "r");
+		char* file;
+		file = strcat( filename, "obstacles.dat");
+		obsfilefid = fopen( file, "r");
 
 		if (obsfilefid != NULL) {
 			fscanf(obsfilefid, "%*[^\n]\n%*[^\n]\n");
@@ -442,7 +451,7 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 			*n_cuboids = (index-1)/3;		index = 0;			return_val = 1;
 		}
 		else {
-			printf("ERROR: could not open obstacle file.\n");
+			LOG(logERROR) << "Could not open obstacle file ["<<file<<"]";
 		}
 	}
 	
@@ -450,4 +459,31 @@ void GenerateInput( char* filename, char* soln, char* sampling, int* max_iter, i
 		fclose(obsfilefid);
 	}
 	filename[strlen(filename)-13] = NULL;
+}
+
+
+char WaitForKey(double maxTimespan)
+{
+	time_t starttime, endtime;
+	char ch;
+	int done = 0;
+
+	time(&starttime);
+	/* Poll for a keypress */
+	while (!done) {
+		if (kbhit()) {
+			/* Get what key was pressed */
+			return getch();
+		}
+
+		/* Check if 10 seconds have elapsed */
+		Sleep(1000);
+		time(&endtime);
+		if (difftime(endtime, starttime) > maxTimespan)
+		{
+			done = 1;
+		}
+
+	}
+	return '\0';
 }
