@@ -211,7 +211,8 @@ int Extend(double* q, double* q_near, double epsilon, int n, double* w, double* 
 
 	/* Test whether the node q_new violates the constraints.  It is implicitly assumed by this algorithm that, provided epsilon is small enough,
 		we can take the incremental segment between q_near and q_new as safe given that their endpoints are safe. */
-	if ( ConstraintViolation( q_new, n, obs, G, DH, indicator ) == false ) {
+	int obs_num = NULL;
+	if ( ConstraintViolation( q_new, n, obs, G, DH, indicator, &obs_num ) == SAFE ) {
 		if ( DistSq(q,q_new,n,w) <= pow(epsilon,2) ) {
 			return 2;		/* Status = "Reached" */
 		}
@@ -807,8 +808,8 @@ int RePlan(struct tree **T_ptrs, int* n_nodes, double* q, int n, double* w, int 
 	
 	double cost_to_go;
 	int num_replans = 0, n_neighbors = 0, cost_type = 2, n_neighborsA, n_neighborsB;
-	n_neighborsA = (int) ceil(max_replan_neighbors*n_nodes[0]);
-	n_neighborsB = (int) ceil(max_replan_neighbors*n_nodes[1]);
+	n_neighborsA = (int) ceil( (max_replan_neighbors/100)*n_nodes[0]);
+	n_neighborsB = (int) ceil( (max_replan_neighbors/100)*n_nodes[1]);
 
 	struct list_node *node_ptr;
 	double *replan_costs	= (double*) malloc(max_replans*sizeof(double));
@@ -994,7 +995,7 @@ void EmergencyPlan( double* q, double* q_emergency, double* q_waypoints, int n, 
 	double epsilon_sq, CPhidgetAdvancedServoHandle servo, int* channels, int plan_num ) {
 
 	double minDist = DBL_MAX, dist;
-	int minDist_index = -1, increment;
+	int minDist_index = -1, increment = FORWARD;
 
 	for (int i = 0; i < n_emergency; i++) {
 		dist = DistSq(q, &q_emergency[i*n], n, w);

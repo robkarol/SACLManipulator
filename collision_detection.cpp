@@ -4,13 +4,13 @@
 #include "obstacles.h"
 #include "tree_data_structure.h"
 #include "linked_list.h"
-#include <iostream>
+#include "log.h"
 
 using namespace std;
 
-int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH, int obs_indicator ) {
+int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH, int obs_indicator, int* obs_num ) {
 	
-	/* Create variables for OBB coordinate storage (8 points per OBB, for a total of "n" links) */
+	/* Create variables for OBB coordinate storage (8 points per OBB, for a total of "n" links and 2 end-effector tips) */
 	int n_points = SumInts(G->N_coords, n+2);
 	struct coords C;
 	C.x = (double*) malloc(n_points*sizeof(double));
@@ -30,7 +30,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 	//}
 	//fclose(datafile);
 
-	int boolean = 0;
+	int flag = 0;
 	double f, f1, f2, f3, f4, f5, f6;
 	double** v		= Make2DDoubleArray(4,1);
 	double** v_new	= Make2DDoubleArray(4,1);
@@ -41,7 +41,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 			for (int j = 0; j < n_points; j++) {
 				f = obs->planes->a[i]*C.x[j] + obs->planes->b[i]*C.y[j] + obs->planes->c[i]*C.z[j] + obs->planes->d[i];
 				if (f < 0) {
-					boolean = 1;
+					flag = PLANAR_COLLISION; *obs_num = i;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -56,7 +56,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 				f5 = obs->cuboids->a[6*i+4]*C.x[j] + obs->cuboids->b[6*i+4]*C.y[j] + obs->cuboids->c[6*i+4]*C.z[j] + obs->cuboids->d[6*i+4];
 				f6 = obs->cuboids->a[6*i+5]*C.x[j] + obs->cuboids->b[6*i+5]*C.y[j] + obs->cuboids->c[6*i+5]*C.z[j] + obs->cuboids->d[6*i+5];
 				if ((f1 < 0) && (f2 < 0) && (f3 < 0) && (f4 < 0) && (f5 < 0) && (f6 < 0)) {
-					boolean = 1;
+					flag = CUBOIDAL_COLLISION; *obs_num = i;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -71,8 +71,8 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 				MatrixMultiply( obs->cylinders->Tinv[i], v, 4, 4, 1, v_new );
 				f = pow( v_new[0][0], 2.0 ) + pow( v_new[1][0], 2.0 ) - pow( obs->cylinders->r[i], 2.0 );
 				if ( (f < 0) && (v_new[2][0] < (obs->cylinders->H[i]/2.0)) && (v_new[2][0] > -(obs->cylinders->H[i]/2.0))) {
-					boolean = 1;
-					cout << "Collision with cylinder " << i << endl;
+					flag = CYLINDRICAL_COLLISION; *obs_num = i;
+					LOG(logDEBUG) << "Collision with cylinder " << i << endl;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -87,7 +87,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 				MatrixMultiply( obs->cones->Tinv[i], v, 4, 4, 1, v_new );
 				f = pow( v_new[0][0], 2.0 ) + pow( v_new[1][0], 2.0 ) - pow( v_new[2][0]*tan(obs->cones->beta[i]*(PI/180)), 2.0 );
 				if ( (f < 0) && (v_new[2][0] > obs->cones->h1[i]) && (v_new[2][0] < obs->cones->h2[i]) ) {
-					boolean = 1;
+					flag = CONICAL_COLLISION; *obs_num = i;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -104,7 +104,7 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 				f = pow( v_new[0][0], 2.0 ) + pow( v_new[1][0], 2.0 ) - pow( v_new[2][0]*tan(obs->temp_zones->beta[i]*(PI/180)), 2.0 );
 					
 				if ( (f < 0) && (v_new[2][0] > obs->temp_zones->h1[i]) && (v_new[2][0] < obs->temp_zones->h2[i]) ) {
-					boolean = 1;
+					flag = TEMPOBS_COLLISION; *obs_num = i;
 					goto END_OF_FUNCTION;
 				}
 			}
@@ -118,10 +118,10 @@ int ConstraintViolation( double* q_new, int n, struct obstacles* obs, struct geo
 	free(v); free(v_new);
 	free(C.x); free(C.y); free(C.z);
 
-	return boolean;
+	return flag;
 }
 
-void TempObsViolation(struct tree** T, int* num_nodes, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH ){
+void TempObsViolation(struct tree** T, int* num_nodes, int n, struct obstacles* obs, struct geom *G, struct DHparams *DH, int num_plan ){
 	
 	/* Create variables for OBB coordinate storage (8 points per OBB, for a total of "n" links) */
 	int n_points = SumInts(G->N_coords, n+2);
@@ -188,7 +188,7 @@ void TempObsViolation(struct tree** T, int* num_nodes, int n, struct obstacles* 
 			/* If a reverse-tree, ensure that the root (goal state) is not unsafe or else abort */
 		//	assert( T[t]->safety[0] == 1 );
 			if (T[t]->safety[0] == 1) {
-				cout << "Goal node is unsafe!!!" << endl;
+				LOG(logINFO) << "Goal node of plan " << num_plan << " is unsafe!!!" << endl;
 			}
 			T[t]->safety[0] = 1;
 		}

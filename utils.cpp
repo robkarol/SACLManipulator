@@ -485,5 +485,5 @@ char WaitForKey(double maxTimespan)
 		}
 
 	}
-	return '\0';
+	return ' ';
 }

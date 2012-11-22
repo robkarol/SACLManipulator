@@ -147,7 +147,8 @@ int main() {
 	char disp_matlab_plots		= 'y';								/* Display MATLAB plots? (y/n/a) [a = "all" (also plots RRT figures, which is very time-consuming)] */
 	char reset_trees			= 'n';								/* Reset the trees during simulation resets? (y/n) */
 	//char filename[FILENAME_MAX]	= "C:/Users/SACL_network/Desktop/SACL/RRT";	/* Full filepath and filename root for reading/writing data, no extension (e.g. "C:/.../Fileroot") */
-	char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
+	char filename[FILENAME_MAX]	= "C:/Users/user/Desktop/SACL/RRT";
+	//char filename[FILENAME_MAX] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/data";
 	//char filename[FILENAME_MAX] = "C:/Users/Joe/Desktop/SACL/RRT";
 	char soln[11]				= "suboptimal";						/* Type of solution to seek: "feasible" (exit at 1st solution found), "suboptimal" (attempt to find "max_neighbors" # of solutions) */
 	char sampling[13]			= "halton";							/* Sampling sequence: "pseudorandom", "halton" */
@@ -247,7 +248,8 @@ int main() {
 	
 	//char	tempsensor_file[]	= "";											/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
 	//char	tempsensor_file[]	= "C:/Users/SACL_network/Desktop/SACL/interfacing.txt";	/* Enter full path to sensor estimation algorithm output file (or enter "" to use potentiometers as simulated sensors for debugging) */
-	char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
+	char	tempsensor_file[]	= "C:/Users/user/Desktop/SACL/interfacing.txt";
+	//char	tempsensor_file[] = "C:/Users/tk001/Desktop/Stanford/Coding/Robotic Arm/interfacing.txt";
 	double pos_x_tempsensors[]  = { 2.0, 2.0, 2.0, 4.0, 4.0, 4.0 };				/* Potentiometer simulation: "sensor_link" body-fixed x-position of each simulated temperature sensor */
 	double pos_y_tempsensors[]  = { 0.0, -1.3, 0.0, 0.0, -1.0, 0.0 };			/* Potentiometer simulation: "sensor_link" body-fixed y-position of each simulated temperature sensor */
 	double pos_z_tempsensors[]  = { 1.25, 0.0, -1.25, 0.9, 0.0, -0.9 };			/* Potentiometer simulation: "sensor_link" body-fixed z-position of each simulated temperature sensor */
@@ -337,14 +339,30 @@ int main() {
 		n_cuboids, xyz_cuboids, LWH_cuboids, YPR_cuboids, i_grip_obs );
 
 	/* Check feasibility of all waypoints */
+	int obs_num = NULL, collision_check = NULL;
 	double* q_test = (double*) malloc( n*sizeof(double) );
 	for (int i = 0; i < n_waypoints; i++) {
 		LOG(logINFO) <<  "Checking feasibility of waypoint #"<< i+1;
 		for (int j = 0; j < n; j++) {
 			q_test[j] = q_waypoints[i*n + j];
 		}
-		if ( ConstraintViolation( q_test, n, obs, G, DH, 0 ) != false) {
-			LOG(logERROR) << "Waypoint infeasible.  Please check that waypoint #" << i+1 <<" and/or geometry values have been entered correctly...";
+		collision_check = ConstraintViolation( q_test, n, obs, G, DH, 0, &obs_num );
+		if ( collision_check != SAFE ) {
+			switch (collision_check) {
+				case PLANAR_COLLISION:
+					LOG(logERROR) << "Waypoint infeasible due to collision with PLANE #" << obs_num << ".";
+					break;
+				case CUBOIDAL_COLLISION:
+					LOG(logERROR) << "Waypoint infeasible due to collision with CUBOID #" << obs_num << ".";
+					break;
+				case CYLINDRICAL_COLLISION:
+					LOG(logERROR) << "Waypoint infeasible due to collision with CYLINDER #" << obs_num << ".";
+					break;
+				case CONICAL_COLLISION:
+					LOG(logERROR) << "Waypoint infeasible due to collision with CONE #" << obs_num << ".";
+					break;
+			};
+			LOG(logERROR) << "Please check that waypoint #" << i+1 <<" and/or geometry values have been entered correctly...";
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -617,7 +635,7 @@ int main() {
 	double pos_maxheat[6] = { 0.0 }, n_hat_tempobs[3] = { 0.0 }, q_grip, epsilon_sq = pow(epsilon,2.0);
 	double* q				= (double*) malloc(n*sizeof(double));
 	double* q_current		= (double*) malloc(n*sizeof(double));
-	int **replan_indices	= Make2DIntArray(max_replans,3);
+	int **replan_indices	= Make2DIntArray( (int) ceil(max_replans*(pow(2.0,max_replan_doubling))), 3);
 	int* temp				= (int*) malloc(n_tempsensors*sizeof(int));
 	obs_indicator			= 2;						// For any new nodes during feedback, check both static and dynamic obstacles for constraint violations.
 	FILE* file_ptr;										// File pointer for reading in temperature sensor normal vectors
@@ -676,7 +694,6 @@ int main() {
 		}
 		else if (i == grip_actions[1]) {
 			BodyFixedOBBcoords( G, n_facepts, grip_pos, grip_sep[2], n );
-
 			LOG(logINFO) << "Dropping target object...";
 			CPhidgetAdvancedServo_setPosition(servo, grip_channel, Deg2Command(grip_angles[2]));
 			do { 
@@ -810,7 +827,7 @@ int main() {
 					PlotTempObstaclesInMATLAB( obs, matlab );
 
 					/* Check temperature obstacles, and keep lists of violating nodes in each tree (set their "safety" properties to 1 or 0, depending) */
-					TempObsViolation( &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, obs, G, DH );
+					TempObsViolation( &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, obs, G, DH, i );
 				}
 				
 				/* Unless unsafe = 1 and the arm is already stopped, commit motion to path[index][k]. Attempt to improve the current plan while executing
@@ -836,8 +853,26 @@ int main() {
 					/* Add q to the appropriate tree, as indicated by the transition index (pathlenA) at which pathA of "path" switches to pathB */
 					SplitPathAtNode( path, q, w, pathA, pathB, pathlenA, index, &(tree_ptrs[2*i]), &(num_nodes[2*i]), n, NN_alg, matlabRRT );
 					
-					if ( ConstraintViolation( q, n, obs, G, DH, 2 ) == 1 ) {
+					collision_check = ConstraintViolation( q, n, obs, G, DH, 2, &obs_num );
+					if ( collision_check != SAFE ) {
 						LOG(logWARNING) <<"Measured point is unsafe!!!";
+						switch (collision_check) {
+							case PLANAR_COLLISION:
+								LOG(logWARNING) << "Point infeasible due to collision with PLANE #" << obs_num << ".";
+								break;
+							case CUBOIDAL_COLLISION:
+								LOG(logWARNING) << "Point infeasible due to collision with CUBOID #" << obs_num << ".";
+								break;
+							case CYLINDRICAL_COLLISION:
+								LOG(logWARNING) << "Point infeasible due to collision with CYLINDER #" << obs_num << ".";
+								break;
+							case CONICAL_COLLISION:
+								LOG(logWARNING) << "Point infeasible due to collision with CONE #" << obs_num << ".";
+								break;
+							case TEMPOBS_COLLISION:
+								LOG(logWARNING) << "Point infeasible due to collision with TEMPOBS #" << obs_num << ".";
+								break;
+						};
 						LOG(logWARNING) << "\tJoint angles "<<q[0]<<" "<<q[1]<<" "<<q[2]<<" "<<q[3]<< endl;
 						if (index > 0) {
 							for (int k = 0; k < n; k++) {
@@ -849,6 +884,9 @@ int main() {
 
 					int doubling = 0;
 					do {
+						if (doubling > 0) {
+							LOG(logINFO) << "Replanning doubling is " << doubling;
+						}
 						/* Find new candidate plans that avoid the use of unsafe nodes from q to q_waypoints[n*(i+1)] using trees[2*i] and trees[2*i+1]
 								(should return same path if nothing new was found due to addition of q to appropriate tree (0 length edge) -> same as MPC )
 								(num_replans <= max_replans -> some feasible paths may be neglected depending on size of max_replan_neighbors) */
@@ -935,7 +973,7 @@ int main() {
 		/* If temperature obstacles were added and the current motion plan is complete,
 		update the trees of the next motion plan to account for the temperature obstacles */
 		if ( (obs->n_temp_zones > 0) && (i < n_plans - 1) ) {
-			TempObsViolation( &(tree_ptrs[2*(i+1)]), &(num_nodes[2*(i+1)]), n, obs, G, DH );
+			TempObsViolation( &(tree_ptrs[2*(i+1)]), &(num_nodes[2*(i+1)]), n, obs, G, DH, i );
 			unsafe		= 1;		// Short-circuits next iteration to a replan cycle
 		}
 
@@ -967,7 +1005,7 @@ int main() {
 	/* Prompt to run again, if desired.  If "y", reset the simulation by resetting trees, replotting, and clearing variables. */
 	printf("Run the simulation again? (y/n): "); fflush(stdout);
 	char x = WaitForKey(10);
-	printf("%s", x);
+	printf("%c\n", x);
 
 	if (x != 'n') {
 		
@@ -995,6 +1033,7 @@ int main() {
 		printf("Close figures and quit MATLAB? (y/n): "); fflush(stdout);
 		//scanf("%s", user_input);
 		char x = WaitForKey(10);
+		printf("%c\n", x);
 		if ( x == 'y' )
 		{
 			engEvalString(matlab, "close all; quit;");

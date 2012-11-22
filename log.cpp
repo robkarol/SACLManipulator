@@ -1,6 +1,6 @@
 #include "log.h"
 
-TLogLevel Log::messageLevel = logINFO;
+TLogLevel Log::messageLevel = logDEBUG;
 
 
 Log::Log()
@@ -31,7 +31,7 @@ std::ostringstream& Log::Get(TLogLevel level)
 	{
 		os << "\t";
 	}
-	messageLevel = level;
+	//messageLevel = level;
 	return os;
 }
 Log::~Log()
